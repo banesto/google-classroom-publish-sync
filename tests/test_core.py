@@ -62,13 +62,49 @@ class PublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Already published'):
             self.prepare()
 
-    def test_wrong_root_and_date(self):
+    def test_wrong_root(self):
         self.config['classes'][0]['root'] = str(self.base / 'different')
         with self.assertRaisesRegex(ValueError, 'exactly one'):
             self.prepare()
-        self.folder.rename(self.folder.with_name('2026.02.30'))
-        with self.assertRaises(ValueError):
-            prepare(self.folder.with_name('2026.02.30'), self.config, self.base)
+
+    def test_any_folder_name_and_depth(self):
+        target = self.base / 'class' / 'Projects' / 'Term 1' / 'Finished exercises'
+        target.parent.mkdir(parents=True)
+        self.folder.rename(target)
+        pub = prepare(target, self.config, self.base)
+        self.assertEqual(pub.text, 'Projects — Term 1 — Finished exercises')
+        self.assertEqual(pub.drive_path, ['class', 'Projects', 'Term 1', 'Finished exercises'])
+
+    def test_direct_child_and_root_itself(self):
+        root = self.base / 'class'
+        target = root / 'Homework'
+        self.folder.rename(target)
+        pub = prepare(target, self.config, self.base)
+        self.assertEqual(pub.text, 'Homework')
+        self.assertEqual(pub.drive_path, ['class', 'Homework'])
+        (root / 'root.jpg').write_bytes(b'test')
+        pub = prepare(root, self.config, self.base)
+        self.assertEqual(pub.text, 'class')
+        self.assertEqual(pub.drive_path, ['class'])
+        self.assertEqual(pub.names, ['root.jpg'])  # Never recurse into Homework.
+
+    def test_overlapping_roots_rejected_for_selected_folder(self):
+        self.config['classes'].append(dict(self.config['classes'][0],
+            root=str(self.folder.parent), drive_path=['class', 'Matemātika']))
+        with self.assertRaisesRegex(ValueError, 'overlapping roots'):
+            self.prepare()
+
+    def test_symlink_cannot_escape_configured_root(self):
+        outside = self.base / 'outside'
+        outside.mkdir()
+        (outside / 'image.jpg').write_bytes(b'test')
+        link = self.base / 'class' / 'linked'
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            self.skipTest('Creating directory symlinks is not allowed on this host.')
+        with self.assertRaisesRegex(ValueError, 'exactly one'):
+            prepare(link, self.config, self.base)
 
     def test_empty_and_unsupported(self):
         for p in self.folder.iterdir():

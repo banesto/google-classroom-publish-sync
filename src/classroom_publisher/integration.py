@@ -2,6 +2,7 @@
 import os
 import sys
 from pathlib import Path
+from .icons import icon_path
 
 KEYS = (r'Software\Classes\Directory\shell\ClassroomPublisher',
         r'Software\Classes\Directory\Background\shell\ClassroomPublisher')
@@ -25,7 +26,7 @@ def context_menu(mode, config):
         if mode == 'install':
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
                 winreg.SetValueEx(key, '', 0, winreg.REG_SZ, 'Publish to Classroom')
-                winreg.SetValueEx(key, 'Icon', 0, winreg.REG_SZ, str(executable))
+                winreg.SetValueEx(key, 'Icon', 0, winreg.REG_SZ, f'"{icon_path("google-classroom")}",0')
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path + r'\command') as key:
                 winreg.SetValueEx(key, '', 0, winreg.REG_SZ, windows_command(executable, config.resolve(), token))
         else:

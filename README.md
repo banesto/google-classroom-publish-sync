@@ -6,7 +6,7 @@ A Python desktop application that publishes a student's Google Classroom **Strea
 
 ## How it works
 
-1. Choose a date folder, either in the app or with Explorer's **Publish to Classroom** action.
+1. Choose a publication folder, either in the app or with Explorer's **Publish to Classroom** action.
 2. Python matches its class root to the configured child and Classroom class.
 3. It validates the folder before opening Chrome, builds the post text, and shows an editable review dialog.
 4. Playwright opens that child's dedicated saved browser profile. Your normal Chrome account is irrelevant; no browser needs to remain open between publications.
@@ -66,7 +66,7 @@ In the configuration, replace the example email addresses, local folder paths, a
 }
 ```
 
-`child` references a key under `children`. `root` is the class root on the computer. `drive_path` is the exact sequence of folder names inside **My Drive** leading to that same class root. Do not include `My Drive` itself, the subject, or the date: the app adds the subject/date from your selected local folder. These are display names, not Drive IDs. A local Windows drive letter alone cannot locate an online Drive folder.
+`child` references a key under `children`. `root` is the class root on the computer. `drive_path` is the exact sequence of folder names inside **My Drive** leading to that same class root. Do not include `My Drive` itself or any folders below the class root: the app appends the selected folder’s entire path relative to that root. These are display names, not Drive IDs. A local Windows drive letter alone cannot locate an online Drive folder.
 
 Use forward slashes in JSON Windows paths, as shown, or double every backslash. Drive letters in the example are illustrative; use the real synced locations. For streamed Drive locations, use the paths visible in Explorer. If you choose another account's path or a different remote folder, the local and online files will not correspond; check the mapping during setup.
 
@@ -103,30 +103,47 @@ G:/My Drive/Homework/Class 4/    configured root
       description.txt          optional UTF-8 text
 ```
 
-The selected folder must be exactly one subject folder and one real `YYYY.MM.DD` date below a configured class root.
+Folder names and depth are unrestricted. Select the configured root itself or any folder beneath it; no date format or subject/date hierarchy is required. For example, `Homework`, `Matemātika/Week 3`, and `Projects/Term 1/Finished exercises` are all accepted. The same relative path is followed in the online Drive picker. Only files directly in the selected folder are published; nested folders are not included.
 
-Supported attachments: **JPG, JPEG, PNG, GIF, WEBP, PDF**, ignoring filename-extension case. Files are direct children only. Subfolders are not recursively published. Supported-extension directories, symlink attachments, empty attachments, missing attachments, and invalid dates are rejected. Other files, including `description.txt`, are not attachments.
+The selection must belong to exactly one configured root. Unrelated locations, symlinks that resolve outside the configured roots, and ambiguous overlapping roots are rejected. The app still relies on your configured roots being synced to the matching child’s Drive.
 
-The first post line is:
+Supported attachments: **JPG, JPEG, PNG, GIF, WEBP, PDF**, ignoring filename-extension case. Files are direct children only. Subfolders are not recursively published. Supported-extension directories, symlink attachments, empty attachments, missing attachments, are rejected. Other files, including `description.txt`, are not attachments.
+
+The default first post line joins the folder names below the class root with ` — `. For the example above it is:
 
 ```text
 Matemātika — 2026.10.15
 ```
 
-The contents of `description.txt`, if present, follow after a blank line. You can edit the body before preparing the draft; the subject/date line is preserved.
+The contents of `description.txt`, if present, follow after a blank line. You can edit the entire post, including its first line, before preparing the draft. If the selected folder is the class root itself, the default title is that root’s name. An empty post is rejected.
 
-Filenames use case-insensitive natural order: `2.jpg` before `10.jpg`. A deterministic filename tiebreaker resolves equivalent natural keys. If there are **more than 20 supported files**, the entire operation is blocked before Chrome opens. A scrollable dialog lists the excess names. No files are published, and no success/pending marker is created by that validation failure. Move the excess files to another date folder and retry.
+Filenames use case-insensitive natural order: `2.jpg` before `10.jpg`. A deterministic filename tiebreaker resolves equivalent natural keys. If there are **more than 20 supported files**, the entire operation is blocked before Chrome opens. A scrollable dialog lists the excess names. No files are published, and no success/pending marker is created by that validation failure. Move the excess files to another publication folder and retry.
 
 ## Everyday use on Windows 11
 
 1. Wait for Google Drive for desktop to sync the folder. Confirm the files are visible in that child's web Drive during initial setup.
-2. Right-click the date folder → **Show more options** → **Publish to Classroom**. Alternatively, open the desktop shortcut and choose **Publish a folder**.
+2. Right-click the publication folder → **Show more options** → **Publish to Classroom**. Alternatively, open the desktop shortcut and choose **Publish a folder**.
 3. Review/edit the text and click **Prepare in Classroom**.
 4. Let the automation select the files. Do not operate the automated Chrome window while it is preparing the draft.
 5. Review the completed draft and approve the final dialog. Do not click Post manually in Chrome.
 6. A success dialog appears only after the persisted post has been verified and the marker saved.
 
-The menu also works on empty background space inside the date folder. The Windows 11 classic context menu placement is intentional; a custom modern shell extension is not required.
+The menu also works on empty background space inside the publication folder. The current installer adds the action to the classic **Show more options** menu. Moving it into Windows 11’s main menu requires a native `IExplorerCommand` COM extension registered with app identity (MSIX or a sparse package). A plain registry verb cannot be promoted there by changing its position or icon. This release does not build/register that native extension or change Explorer’s global menu behavior. See [Microsoft’s extension requirements](https://learn.microsoft.com/windows/apps/desktop/modernize/integrate-packaged-app-with-file-explorer).
+
+### Icons
+
+The Explorer action now uses Google’s official Classroom integration icon. The desktop shortcut and application windows use an original chalkboard icon instead of the Python icon. Google’s [branding guidance](https://developers.google.com/workspace/classroom/brand) provides the integration icon but distinguishes it from an independent application’s own logo. Source attribution is bundled in `src/classroom_publisher/assets/ATTRIBUTION.md`.
+
+![Chalkboard shortcut icon options](docs/icon-options.png)
+
+The default is **chalkboard-check**. To choose another desktop shortcut icon, rerun the installer from the updated checkout with one of these options:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1 -ShortcutIcon chalkboard-book
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1 -ShortcutIcon chalkboard-pencil
+```
+
+Omit `-ShortcutIcon` or set it to `chalkboard-check` to restore the default. This option changes the desktop shortcut; app windows retain the default chalkboard-check icon and the Explorer action retains the Classroom icon. Rerunning the installer updates both the menu registration and shortcut while preserving configuration and saved logins. Windows may cache an old shortcut image until Explorer refreshes. Actual Windows rendering still needs a Windows 11 check.
 
 The review window shows the child, class URL, remote folder path, and ordered attachment names. Wrong-account, missing-file, ambiguous-file, changed-file, reordered-attachment, and uncertain-post checks stop the process. The application does not delete a potentially faulty post automatically.
 
@@ -151,7 +168,7 @@ If a timeout occurs after clicking Post, Google might still have accepted the po
 To recover:
 
 1. Open the app and use **Sign in / inspect class** for the correct child. Inspect the Stream, compare the full text and attachments, and reload. Close any old composer.
-2. Reopen the app, choose **Recover an uncertain attempt**, and select the date folder.
+2. Reopen the app, choose **Recover an uncertain attempt**, and select the publication folder.
 3. Enter `VERIFIED` only if the complete post exists with the correct author and attachment order; provide its link if available. This creates the success marker from the saved attempt.
 4. Enter `ABSENT` only if you have established that nothing was posted and all old composers are closed. Confirm clearing the attempt to permit a later retry.
 5. If uncertain, cancel. The folder stays blocked.

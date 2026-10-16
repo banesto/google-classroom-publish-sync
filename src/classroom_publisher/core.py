@@ -66,16 +66,19 @@ def prepare(folder, config, config_dir):
         raise ValueError('Already published: classroom-published.txt exists.')
     if (folder / PENDING).exists():
         raise ValueError('Unresolved attempt. Inspect Classroom and use Recover; do not retry.')
-    if not re.fullmatch(r'\d{4}\.\d{2}\.\d{2}', folder.name):
-        raise ValueError('Publication folder must be YYYY.MM.DD.')
-    datetime.strptime(folder.name, '%Y.%m.%d')
-    matches = [c for c in config['classes'] if folder.parent.parent == resolve_path(c['root'], config_dir)]
+    matches = []
+    for c in config['classes']:
+        root = resolve_path(c['root'], config_dir)
+        if folder == root or root in folder.parents:
+            matches.append((c, root))
     if len(matches) != 1:
-        raise ValueError('Folder must match exactly one configured class root / subject / date.')
-    c = matches[0]
+        raise ValueError('Folder must be within exactly one configured class root. '
+                         'Folders outside those roots or inside overlapping roots cannot be published.')
+    c, root = matches[0]
+    relative_parts = list(folder.relative_to(root).parts)
     child = config['children'][c['child']]
     snapshot = attachment_snapshot(folder)
-    text = folder.parent.name + ' — ' + folder.name
+    text = ' — '.join(relative_parts) if relative_parts else root.name
     description = folder / 'description.txt'
     if description.exists():
         extra = description.read_text(encoding='utf-8-sig').strip()
@@ -83,7 +86,7 @@ def prepare(folder, config, config_dir):
             text += '\n\n' + extra
     return Publication(folder, c['child'], child['email'].strip(),
                        profile_path(c['child'], config, config_dir), c['url'], text,
-                       list(snapshot), c['drive_path'] + [folder.parent.name, folder.name], snapshot)
+                       list(snapshot), c['drive_path'] + relative_parts, snapshot)
 
 
 def exclusive_write(path, text):

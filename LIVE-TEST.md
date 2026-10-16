@@ -38,3 +38,12 @@ Status: NOT RUN — awaiting a child account, configured folder and class URL.
 - Failures / limitations / required changes:
 
 Do not commit passwords, cookies, live screenshots or browser-profile data. Keep student-specific configuration local.
+
+## Folder and icon update — version 0.3.0
+
+- Publication folders now support arbitrary names and depth within one configured class root, including the root itself. Only direct attachments are published.
+- 16 core/safety tests passed, including nested paths, root selection, ambiguous roots and a symlink outside the allowed root.
+- 18 existing browser tests passed, followed by the new nested non-date folder end-to-end browser test (19 browser tests total). All used local simulated pages.
+- Built the 0.3.0 wheel and verified it contains the four PNG/ICO icon pairs and attribution. ICO files include 16px and 32px frames; app icons also include 256px frames.
+- Original chalkboard icon preview visually inspected. Google Classroom integration icon sourced from Google's official asset archive.
+- Windows 11 icon display and installer remain unverified on a Windows host. The native Windows 11 main-menu extension has not been implemented; the installed action still uses Show more options.

@@ -1,12 +1,21 @@
 """Tk dialogs keep the ordinary workflow usable from Explorer without a terminal."""
 import tkinter as tk
+import sys
 from tkinter import filedialog, messagebox, simpledialog, ttk
+from .icons import icon_path
 
 
 class UI:
     def __init__(self):
+        if sys.platform == 'win32':
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('ClassroomPublisher.Desktop')
         self.root = tk.Tk()
         self.root.withdraw()
+        self.icon = tk.PhotoImage(file=str(icon_path(extension='png')))
+        self.root.iconphoto(True, self.icon)
+        if sys.platform == 'win32':
+            self.root.iconbitmap(default=str(icon_path()))
         self.progress = None
 
     def close(self):
@@ -66,8 +75,8 @@ class UI:
         result = []
         def accept():
             value = box.get('1.0', 'end-1c').strip()
-            if not value or value.splitlines()[0] != pub.text.splitlines()[0]:
-                messagebox.showerror('Check post', 'Keep subject and date as the first line.', parent=win)
+            if not value:
+                messagebox.showerror('Check post', 'Enter some text for the post.', parent=win)
                 return
             result.append(value)
             win.destroy()
@@ -123,7 +132,7 @@ class UI:
         result = []
         def action(command, target=None):
             if command in ('publish', 'validate', 'reconcile'):
-                target = filedialog.askdirectory(title='Select the YYYY.MM.DD publication folder', parent=win)
+                target = filedialog.askdirectory(title='Select the folder to publish', parent=win)
                 if not target:
                     return
             result.extend([command, target])

@@ -63,7 +63,7 @@ PICKER = r'''<!doctype html><html><head><meta charset="utf-8"></head><body>
 <button role="tab" id="mydrive">My Drive</button>
 <nav aria-label="Breadcrumb"></nav><div id="rows"></div><button id="insert">Insert</button>
 <script>
-const path=['class','Matemātika','2026.10.15'];
+const path=FOLDERPATH;
 const files=FILES;
 let depth=0, chosen=null;
 function render(){
@@ -130,7 +130,8 @@ class BrowserTests(unittest.TestCase):
     def route(self, route):
         url = route.request.url
         if url == 'https://docs.google.com/picker':
-            route.fulfill(content_type='text/html', body=PICKER.replace('FILES', json.dumps(self.files)))
+            route.fulfill(content_type='text/html', body=PICKER.replace('FILES', json.dumps(self.files))
+                          .replace('FOLDERPATH', json.dumps(self.pub.drive_path)))
         elif url.endswith('/fixture/publish'):
             self.post_calls += 1
             post = dict(json.loads(route.request.post_data), id='new-post')
@@ -226,6 +227,19 @@ class BrowserTests(unittest.TestCase):
         self.assertIn(self.pub.text, marker)
         self.assertIn('https://classroom.google.com/c/test/p/new-post', marker)
         self.assertFalse((self.folder / PENDING).exists())
+
+    def test_nested_non_date_folder_end_to_end(self):
+        (self.folder / PENDING).unlink()  # No browser work has started in this fixture.
+        target = Path(self.tmp.name) / 'class' / 'Projects' / 'Term 1' / 'Finished exercises'
+        target.parent.mkdir(parents=True)
+        self.folder.rename(target)
+        self.folder = target
+        self.pub = prepare(target, self.config, Path(self.tmp.name))
+        begin(self.pub)
+        self.assertTrue(self.run_flow())
+        self.assertEqual(self.post_calls, 1)
+        self.assertIn('Projects — Term 1 — Finished exercises',
+                      (target / MARKER).read_text(encoding='utf-8'))
 
     def test_wrong_account_stops_before_post(self):
         self.account = 'other@example.com'

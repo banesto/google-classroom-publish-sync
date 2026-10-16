@@ -1,4 +1,8 @@
 # Installs for the current Windows user. No administrator rights needed.
+param(
+    [ValidateSet('chalkboard-check', 'chalkboard-book', 'chalkboard-pencil')]
+    [string]$ShortcutIcon = 'chalkboard-check'
+)
 $ErrorActionPreference = 'Stop'
 $installRoot = Join-Path $env:LOCALAPPDATA 'ClassroomPublisher'
 $appRoot = Join-Path $installRoot 'app'
@@ -8,7 +12,7 @@ if ([IO.Path]::GetFullPath($sourceRoot).TrimEnd('\') -eq [IO.Path]::GetFullPath(
 }
 Get-Command py -ErrorAction Stop | Out-Null
 New-Item -ItemType Directory -Force -Path $appRoot | Out-Null
-foreach ($entry in @('src', 'pyproject.toml', 'README.md', 'LIVE-TEST.md', 'config.example.json', 'ui.reference.json', 'scripts')) {
+foreach ($entry in @('src', 'pyproject.toml', 'README.md', 'LIVE-TEST.md', 'config.example.json', 'ui.reference.json', 'scripts', 'docs')) {
     Copy-Item -Path (Join-Path $sourceRoot $entry) -Destination $appRoot -Recurse -Force
 }
 $pythonExe = Join-Path $appRoot '.venv\Scripts\python.exe'
@@ -32,6 +36,9 @@ $shortcut = $shellObject.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = Join-Path $appRoot '.venv\Scripts\pythonw.exe'
 $shortcut.Arguments = '-m classroom_publisher.cli gui --config "' + $configPath + '"'
 $shortcut.WorkingDirectory = $appRoot
+$iconPath = & $pythonExe -c "from classroom_publisher.icons import icon_path; print(icon_path('$ShortcutIcon'))"
+if ($LASTEXITCODE -ne 0) { throw 'Could not locate the installed shortcut icon.' }
+$shortcut.IconLocation = '"' + $iconPath.Trim() + '",0'
 $shortcut.Save()
 Write-Host "Installed. Edit $configPath, then open the Classroom Publisher desktop shortcut."
 Write-Host 'First live Classroom test is still required; see README.md.'
