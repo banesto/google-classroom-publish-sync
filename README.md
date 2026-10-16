@@ -136,14 +136,14 @@ The Explorer action now uses Google’s official Classroom integration icon. The
 
 ![Chalkboard shortcut icon options](docs/icon-options.png)
 
-The default is **chalkboard-check**. To choose another desktop shortcut icon, rerun the installer from the updated checkout with one of these options:
+The default is **chalkboard-book** (option 2). To choose another desktop shortcut icon, rerun the installer from the updated checkout with one of these options:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1 -ShortcutIcon chalkboard-book
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1 -ShortcutIcon chalkboard-check
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1 -ShortcutIcon chalkboard-pencil
 ```
 
-Omit `-ShortcutIcon` or set it to `chalkboard-check` to restore the default. This option changes the desktop shortcut; app windows retain the default chalkboard-check icon and the Explorer action retains the Classroom icon. Rerunning the installer updates both the menu registration and shortcut while preserving configuration and saved logins. Windows may cache an old shortcut image until Explorer refreshes. Actual Windows rendering still needs a Windows 11 check.
+Omit `-ShortcutIcon` or set it to `chalkboard-book` to restore the default. This option changes the desktop shortcut; app windows retain the default chalkboard-book icon and the Explorer action retains the Classroom icon. Rerunning the installer updates both the menu registration and shortcut while preserving configuration and saved logins. Windows may cache an old shortcut image until Explorer refreshes. Actual Windows rendering still needs a Windows 11 check.
 
 The review window shows the child, class URL, remote folder path, and ordered attachment names. Wrong-account, missing-file, ambiguous-file, changed-file, reordered-attachment, and uncertain-post checks stop the process. The application does not delete a potentially faulty post automatically.
 

@@ -2,7 +2,7 @@
 from pathlib import Path
 
 
-def icon_path(name='chalkboard-check', extension='ico'):
+def icon_path(name='chalkboard-book', extension='ico'):
     if name not in ('chalkboard-check', 'chalkboard-book', 'chalkboard-pencil', 'google-classroom'):
         raise ValueError('Unknown bundled icon.')
     if extension not in ('ico', 'png'):

@@ -1,7 +1,7 @@
 # Installs for the current Windows user. No administrator rights needed.
 param(
     [ValidateSet('chalkboard-check', 'chalkboard-book', 'chalkboard-pencil')]
-    [string]$ShortcutIcon = 'chalkboard-check'
+    [string]$ShortcutIcon = 'chalkboard-book'
 )
 $ErrorActionPreference = 'Stop'
 $installRoot = Join-Path $env:LOCALAPPDATA 'ClassroomPublisher'
