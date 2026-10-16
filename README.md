@@ -145,6 +145,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1 -S
 
 Omit `-ShortcutIcon` or set it to `chalkboard-book` to restore the default. This option changes the desktop shortcut; app windows retain the default chalkboard-book icon and the Explorer action retains the Classroom icon. Rerunning the installer updates both the menu registration and shortcut while preserving configuration and saved logins. Windows may cache an old shortcut image until Explorer refreshes. Actual Windows rendering still needs a Windows 11 check.
 
+If the desktop shortcut shows a blank page, update your checkout/download and run this from its folder:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\repair-shortcut.ps1
+```
+
+This recreates the shortcut with the selected chalkboard-book icon (option 2), using an unquoted icon location and a separate local icon file to avoid the old cached path. It preserves configuration and saved logins and does not reinstall dependencies. Press F5 on the desktop if the old image remains. The repair script also accepts `-ShortcutIcon` with the options above.
+
 The review window shows the child, class URL, remote folder path, and ordered attachment names. Wrong-account, missing-file, ambiguous-file, changed-file, reordered-attachment, and uncertain-post checks stop the process. The application does not delete a potentially faulty post automatically.
 
 ## Success markers and recovery
