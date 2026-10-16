@@ -10,7 +10,8 @@ from .config import class_id, profile_path
 from .core import begin, confirm, recheck, update_pending
 
 DEFAULT_UI = {
-    'account': '[aria-label*="Google Account:"]:visible',
+    'account': ('a[href^="https://accounts.google.com/SignOutOptions"], '
+                '[aria-label*="Google Account"], [data-tooltip*="Google Account"]'),
     'open_composer': {'text': 'Announce something to your class'},
     'composer': '[role="dialog"]:has([contenteditable="true"]), form:has([contenteditable="true"])',
     'editor': '[contenteditable="true"][role="textbox"]',
@@ -84,10 +85,26 @@ class ClassroomPage:
     def identity(self, pub):
         if class_id(self.page.url) != class_id(pub.url):
             raise ValueError('The browser is in the wrong class.')
-        account = unique(locate(self.page, self.ui['account']), 'Active Google account')
-        value = ' '.join([account.get_attribute('aria-label') or '', account.get_attribute('title') or '',
-                          account.inner_text()])
+        # Google localizes the account label. The account-menu URL identifies
+        # the control independently of language; never search the whole page
+        # for the desired email (it could belong to a classmate or another login).
+        controls = locate(self.page, self.ui['account']).filter(visible=True)
+        if controls.count() != 1:
+            raise ValueError(
+                'Cannot identify the active Google account control '
+                f'({controls.count()} visible matches). Your login may be valid. '
+                'The account indicator may still be loading, or ui.account needs '
+                'adjusting for this Classroom layout. No publication is allowed '
+                'until the active email can be verified.')
+        account = controls
+        value = ' '.join([account.get_attribute(attr) or ''
+                          for attr in ('aria-label', 'title', 'data-tooltip')]
+                         + [account.inner_text()])
         emails = set(re.findall(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', value.casefold()))
+        if not emails:
+            raise ValueError('The Google account control is visible, but it does not expose an email. '
+                             'Inspect its label/tooltip before changing ui.account; '
+                             'the configured email alone is not proof of the active login.')
         if emails != {pub.email.casefold()}:
             raise ValueError('Active Google account does not match ' + pub.email + '. Use Sign in for this child.')
         return True
@@ -296,7 +313,10 @@ def sign_in(child, config, base, ui, inspect=False):
                 page.pause()
             # Verify login against the configured account; no publish or pending files.
             from types import SimpleNamespace
-            ClassroomPage(page, config).identity(SimpleNamespace(url=target, email=config['children'][child]['email']))
+            adapter = ClassroomPage(page, config)
+            adapter.wait(lambda: adapter.identity(SimpleNamespace(
+                url=target, email=config['children'][child]['email'])),
+                'Could not verify the signed-in account')
             ui.info('Login saved', 'This child’s dedicated browser profile is ready.')
         finally:
             context.close()

@@ -1,6 +1,6 @@
 {
   "ui": {
-    "account": "[aria-label*=\"Google Account:\"]:visible",
+    "account": "a[href^=\"https://accounts.google.com/SignOutOptions\"], [aria-label*=\"Google Account\"], [data-tooltip*=\"Google Account\"]",
     "open_composer": {
       "text": "Announce something to your class"
     },

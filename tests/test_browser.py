@@ -8,7 +8,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from classroom_publisher.browser import run_publication
+from classroom_publisher.browser import ClassroomPage, run_publication
 from classroom_publisher.core import MARKER, PENDING, begin, prepare
 
 CLASSROOM = r'''<!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -151,6 +151,67 @@ class BrowserTests(unittest.TestCase):
 
     def run_flow(self, review=lambda pub: True):
         return run_publication(self.page, self.pub, self.config, review)
+
+    def account_page(self):
+        self.page.goto(self.pub.url)
+        return self.page.locator('a[aria-label]')
+
+    def test_localized_account_label_with_menu_link(self):
+        account = self.account_page()
+        account.evaluate('''el => {
+            el.setAttribute('aria-label', 'Google konts: Bērns (child@example.com)');
+            el.setAttribute('href', 'https://accounts.google.com/SignOutOptions?hl=lv');
+        }''')
+        self.assertTrue(ClassroomPage(self.page, self.config).identity(self.pub))
+
+    def test_account_email_in_tooltip(self):
+        account = self.account_page()
+        account.evaluate('''el => {
+            el.removeAttribute('aria-label');
+            el.setAttribute('href', 'https://accounts.google.com/SignOutOptions');
+            el.setAttribute('data-tooltip', 'Google konts: child@example.com');
+        }''')
+        self.assertTrue(ClassroomPage(self.page, self.config).identity(self.pub))
+
+    def test_hidden_duplicate_account_control_ignored(self):
+        account = self.account_page()
+        account.evaluate('''el => {
+            const copy = el.cloneNode(true); copy.hidden = true; el.after(copy);
+        }''')
+        self.assertTrue(ClassroomPage(self.page, self.config).identity(self.pub))
+
+    def test_multiple_visible_account_controls_rejected(self):
+        account = self.account_page()
+        account.evaluate('el => el.after(el.cloneNode(true))')
+        with self.assertRaisesRegex(ValueError, '2 visible matches'):
+            ClassroomPage(self.page, self.config).identity(self.pub)
+
+    def test_email_elsewhere_is_not_identity_evidence(self):
+        account = self.account_page()
+        account.evaluate('''el => {
+            el.remove(); const p = document.createElement('p');
+            p.textContent = 'child@example.com'; document.body.append(p);
+        }''')
+        with self.assertRaisesRegex(ValueError, '0 visible matches'):
+            ClassroomPage(self.page, self.config).identity(self.pub)
+
+    def test_localized_wrong_account_still_rejected(self):
+        account = self.account_page()
+        account.evaluate('''el => {
+            el.setAttribute('aria-label', 'Google konts: other@example.com');
+            el.setAttribute('href', 'https://accounts.google.com/SignOutOptions');
+        }''')
+        with self.assertRaisesRegex(ValueError, 'does not match'):
+            ClassroomPage(self.page, self.config).identity(self.pub)
+
+    def test_account_indicator_can_load_late(self):
+        account = self.account_page()
+        account.evaluate('''el => {
+            const label = el.getAttribute('aria-label'); el.removeAttribute('aria-label');
+            setTimeout(() => el.setAttribute('aria-label', label), 250);
+        }''')
+        adapter = ClassroomPage(self.page, self.config)
+        self.assertTrue(adapter.wait(lambda: adapter.identity(self.pub), 'Account failed to load'))
 
     def assert_blocked(self, calls):
         self.assertTrue((self.folder / PENDING).exists())

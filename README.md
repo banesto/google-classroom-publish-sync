@@ -88,6 +88,8 @@ Open the desktop shortcut. Choose `child1` and click **Sign in / inspect class**
 
 Repeat for the other two children. There is no need to keep those windows open. If Google rejects sign-in in the automated browser, stop and record the error; this app does not bypass login protections.
 
+If sign-in succeeds but account verification fails, this can be a page-detection problem rather than an authentication problem. The app recognizes the Google account-menu link independently of its translated label and reads the active email from the control's label, title, or tooltip. It waits for the control to load and still refuses ambiguous controls or a different email. It never accepts an email merely because it appears somewhere on the class page. After updating, remove any old English-only `ui.account` override from your configuration to use the improved default. You do not need to delete the child's saved profile. If verification still fails, inspect the actual account control before changing the selector; do not disable the email check.
+
 **Do the first two-file test before relying on automatic publishing.** A teacher must allow student Stream posts. The current page selectors assume English labels; your account's interface may use different labels or markup. See “First live test and UI adaptation” below.
 
 ## Preparing a publication folder
