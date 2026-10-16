@@ -1,0 +1,228 @@
+"""Full publication flow against a local fake Classroom/Drive UI.
+
+Every network request is intercepted. No Google service is contacted.
+Enable with CLASSROOM_BROWSER_TESTS=1 and installed Chrome.
+"""
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from classroom_publisher.browser import run_publication
+from classroom_publisher.core import MARKER, PENDING, begin, prepare
+
+CLASSROOM = r'''<!doctype html><html><head><meta charset="utf-8"></head><body>
+<a aria-label="Google Account: Child (ACCOUNT)">Account</a>
+<button id="open">Announce something to your class</button>
+<div id="composer" role="dialog" hidden>
+<div contenteditable="true" role="textbox"></div>
+<button id="add">Add</button>
+<button role="menuitem" id="drive" hidden>Google Drive</button>
+<section id="attachments"></section><button id="post">Post</button></div>
+<section id="stream"></section>
+<script>
+const saved = SAVED;
+let selected=[];
+function render(post) {
+ let article=document.createElement('article'); article.dataset.streamItemId=post.id;
+ let body=document.createElement('p'); body.textContent=post.text; article.append(body);
+ for (let f of post.files) {
+  let a=document.createElement('a'); a.href='https://drive.google.com/file/d/'+f.id+'/view';
+  a.textContent=f.name; article.append(a);
+ }
+ let a=document.createElement('a'); a.href='/c/test/p/'+post.id; a.textContent='Post link'; article.append(a);
+ document.querySelector('#stream').append(article);
+}
+saved.forEach(render);
+document.querySelector('#open').onclick=()=>document.querySelector('#composer').hidden=false;
+document.querySelector('#add').onclick=()=>document.querySelector('#drive').hidden=false;
+document.querySelector('#drive').onclick=()=> {
+ document.querySelector('#drive').hidden=true;
+ let frame=document.createElement('iframe'); frame.src='https://docs.google.com/picker'; document.body.append(frame);
+};
+window.addEventListener('message', event=> {
+ if (!event.data.file) return;
+ selected.push(event.data.file);
+ document.querySelector('iframe').remove();
+ let files=REORDER ? [...selected].reverse() : selected;
+ document.querySelector('#attachments').innerHTML='';
+ for (let f of files) {
+  let a=document.createElement('a'); a.href='https://drive.google.com/file/d/'+f.id+'/view';
+  a.textContent=f.name; document.querySelector('#attachments').append(a);
+ }
+});
+document.querySelector('#post').onclick=async()=> {
+ let result=await fetch('/fixture/publish',{method:'POST',body:JSON.stringify({
+  text:document.querySelector('[contenteditable]').innerText, files:selected
+ })});
+ if (result.ok) { let post=await result.json(); document.querySelector('#composer').hidden=true; render(post); }
+};
+</script></body></html>'''
+
+PICKER = r'''<!doctype html><html><head><meta charset="utf-8"></head><body>
+<button role="tab" id="mydrive">My Drive</button>
+<nav aria-label="Breadcrumb"></nav><div id="rows"></div><button id="insert">Insert</button>
+<script>
+const path=['class','Matemātika','2026.10.15'];
+const files=FILES;
+let depth=0, chosen=null;
+function render(){
+ let nav=document.querySelector('nav'); nav.innerHTML='';
+ for(let name of ['My Drive',...path.slice(0,depth)]) {
+  let b=document.createElement('button'); b.textContent=name; nav.append(b);
+ }
+ let container=document.querySelector('#rows'); container.innerHTML='';
+ let items=depth<path.length ? [{name:path[depth],id:'folder'+depth}] : files;
+ for(let item of items){
+  let row=document.createElement('div'); row.setAttribute('role','row'); row.dataset.id=item.id;
+  let label=document.createElement('span'); label.textContent=item.name; row.append(label);
+  row.ondblclick=()=>{if(depth<path.length){depth++;render();}};
+  row.onclick=()=>{chosen=item;}; container.append(row);
+ }
+}
+document.querySelector('#mydrive').onclick=()=>{depth=0;render();};
+document.querySelector('#insert').onclick=()=>{if(chosen)parent.postMessage({file:chosen},'*');};
+render();
+</script></body></html>'''
+
+
+@unittest.skipUnless(os.environ.get('CLASSROOM_BROWSER_TESTS') == '1', 'Set CLASSROOM_BROWSER_TESTS=1 for local Chrome integration tests')
+class BrowserTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from playwright.sync_api import sync_playwright
+        cls.playwright = sync_playwright().start()
+        cls.tmp_profile = tempfile.TemporaryDirectory()
+        cls.browser = cls.playwright.chromium.launch_persistent_context(cls.tmp_profile.name, channel='chrome', headless=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.browser.close()
+        cls.playwright.stop()
+        cls.tmp_profile.cleanup()
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        base = Path(self.tmp.name)
+        self.folder = base / 'class' / 'Matemātika' / '2026.10.15'
+        self.folder.mkdir(parents=True)
+        for name in ['10.jpg', '2.jpg']:
+            (self.folder / name).write_bytes(b'local test file; never uploaded')
+        self.config = {'children': {'one': {'email': 'child@example.com', 'profile': str(base / 'profile')}},
+                       'classes': [{'child': 'one', 'root': str(base / 'class'), 'drive_path': ['class'],
+                                    'url': 'https://classroom.google.com/c/test'}], 'timeout_ms': 1200}
+        self.pub = prepare(self.folder, self.config, base)
+        self.pub.text += '\n\nIzpildīti uzdevumi 35–40.'
+        begin(self.pub)
+        self.posts = []
+        self.post_calls = 0
+        self.account = 'child@example.com'
+        self.files = [{'name': '2.jpg', 'id': 'drive2'}, {'name': '10.jpg', 'id': 'drive10'}]
+        self.reorder = False
+        self.persist = True
+        self.fail_click_response = False
+        self.reload_mutation = False
+        self.page = self.browser.new_page()
+        self.addCleanup(self.page.close)
+        self.page.route('**/*', self.route)
+
+    def route(self, route):
+        url = route.request.url
+        if url == 'https://docs.google.com/picker':
+            route.fulfill(content_type='text/html', body=PICKER.replace('FILES', json.dumps(self.files)))
+        elif url.endswith('/fixture/publish'):
+            self.post_calls += 1
+            post = dict(json.loads(route.request.post_data), id='new-post')
+            if self.persist:
+                self.posts.append(post)
+            if self.fail_click_response:
+                route.abort()
+            else:
+                route.fulfill(content_type='application/json', body=json.dumps(post))
+        elif url == 'https://classroom.google.com/c/test':
+            posts = json.loads(json.dumps(self.posts))
+            if self.reload_mutation and posts:
+                posts[-1]['files'][-1]['id'] = 'wrong-drive-id'
+            html = CLASSROOM.replace('ACCOUNT', self.account).replace('SAVED', json.dumps(posts))
+            route.fulfill(content_type='text/html', body=html.replace('REORDER', str(self.reorder).lower()))
+        else:
+            route.abort()  # Fixture cannot reach real Google or download anything.
+
+    def run_flow(self, review=lambda pub: True):
+        return run_publication(self.page, self.pub, self.config, review)
+
+    def assert_blocked(self, calls):
+        self.assertTrue((self.folder / PENDING).exists())
+        self.assertFalse((self.folder / MARKER).exists())
+        self.assertEqual(self.post_calls, calls)
+
+    def test_two_file_end_to_end_and_marker(self):
+        self.assertTrue(self.run_flow())
+        self.assertEqual(self.post_calls, 1)
+        self.assertEqual([a['id'] for a in self.posts[0]['files']], ['drive2', 'drive10'])
+        marker = (self.folder / MARKER).read_text(encoding='utf-8')
+        self.assertIn(self.pub.text, marker)
+        self.assertIn('https://classroom.google.com/c/test/p/new-post', marker)
+        self.assertFalse((self.folder / PENDING).exists())
+
+    def test_wrong_account_stops_before_post(self):
+        self.account = 'other@example.com'
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assert_blocked(0)
+
+    def test_missing_remote_file_stops(self):
+        self.files.pop()
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assert_blocked(0)
+
+    def test_duplicate_remote_filename_stops(self):
+        self.files.append({'name': '2.jpg', 'id': 'duplicate'})
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assert_blocked(0)
+
+    def test_reordered_attachments_stop(self):
+        self.reorder = True
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assert_blocked(0)
+
+    def test_existing_body_stops_duplicate(self):
+        self.posts = [{'id': 'old-post', 'text': self.pub.text, 'files': self.files}]
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assert_blocked(0)
+
+    def test_cancelling_draft_never_posts(self):
+        self.assertFalse(self.run_flow(lambda pub: False))
+        self.assert_blocked(0)
+
+    def test_changed_local_file_stops_before_post(self):
+        def review(pub):
+            (pub.folder / '2.jpg').write_bytes(b'changed')
+            return True
+        with self.assertRaises(ValueError):
+            self.run_flow(review)
+        self.assert_blocked(0)
+
+    def test_disappearing_post_after_reload_is_uncertain(self):
+        self.persist = False
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assert_blocked(1)
+
+    def test_wrong_persisted_drive_id_is_uncertain(self):
+        self.reload_mutation = True
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assert_blocked(1)
+
+    def test_network_failure_after_acceptance_does_not_retry(self):
+        self.fail_click_response = True
+        with self.assertRaises(ValueError):
+            self.run_flow()
+        self.assertEqual(len(self.posts), 1)
+        self.assert_blocked(1)

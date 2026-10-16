@@ -1,0 +1,21 @@
+# Local configuration and Google sessions
+config.json
+config.*.local.json
+profiles/
+.classroom-pending.json
+classroom-published.txt
+
+# Python / builds
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Local artifacts
+.DS_Store
+*.log
+*.zip

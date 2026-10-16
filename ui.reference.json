@@ -1,0 +1,38 @@
+{
+  "ui": {
+    "account": "[aria-label*=\"Google Account:\"]:visible",
+    "open_composer": {
+      "text": "Announce something to your class"
+    },
+    "composer": "[role=\"dialog\"]:has([contenteditable=\"true\"]), form:has([contenteditable=\"true\"])",
+    "editor": "[contenteditable=\"true\"][role=\"textbox\"]",
+    "add": {
+      "role": "button",
+      "name": "Add"
+    },
+    "drive": {
+      "role": "menuitem",
+      "name": "Google Drive"
+    },
+    "post": {
+      "role": "button",
+      "name": "Post"
+    },
+    "picker_frame": "iframe[src*=\"docs.google.com/picker\"], iframe[src*=\"drive.google.com/picker\"]",
+    "picker_my_drive": {
+      "role": "tab",
+      "name": "My Drive"
+    },
+    "picker_rows": "[role=\"row\"]",
+    "picker_breadcrumbs": "[aria-label=\"Breadcrumb\"] button, [aria-label=\"Breadcrumb\"] [role=\"button\"]",
+    "picker_file_id_attribute": "data-id",
+    "picker_select": {
+      "role": "button",
+      "name": "Insert"
+    },
+    "attachments": "a[href*=\"drive.google.com/file/d/\"], a[href*=\"drive.google.com/open?\"]",
+    "posts": "[data-stream-item-id]",
+    "post_id_attribute": "data-stream-item-id",
+    "post_link": "a[href*=\"/p/\"]"
+  }
+}

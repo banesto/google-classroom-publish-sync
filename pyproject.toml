@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "classroom-publisher"
+version = "0.2.0"
+description = "Student Stream publisher using dedicated browser profiles"
+requires-python = ">=3.9"
+dependencies = ["playwright==1.60.0"]
+
+[project.scripts]
+classroom-publisher = "classroom_publisher.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,30 @@
+{
+  "children": {
+    "child1": {"email": "child1@example.com"},
+    "child2": {"email": "child2@example.com"},
+    "child3": {"email": "child3@example.com"}
+  },
+  "classes": [
+    {
+      "child": "child1",
+      "root": "G:/My Drive/Homework/Class 4",
+      "drive_path": ["Homework", "Class 4"],
+      "url": "https://classroom.google.com/c/REPLACE_CLASS_ID_1"
+    },
+    {
+      "child": "child2",
+      "root": "H:/My Drive/Homework/Class 2",
+      "drive_path": ["Homework", "Class 2"],
+      "url": "https://classroom.google.com/c/REPLACE_CLASS_ID_2"
+    },
+    {
+      "child": "child3",
+      "root": "I:/My Drive/Homework/Class 1",
+      "drive_path": ["Homework", "Class 1"],
+      "url": "https://classroom.google.com/c/REPLACE_CLASS_ID_3"
+    }
+  ],
+  "browser_channel": "chrome",
+  "timeout_ms": 20000,
+  "ui": {}
+}
