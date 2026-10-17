@@ -24,7 +24,7 @@ DEFAULT_UI = {
     'picker_rows': '[role="row"], [role="option"][data-target="doc"]',
     'picker_breadcrumbs': '[aria-label="Breadcrumb"] button, [aria-label="Breadcrumb"] [role="button"], [role="button"][data-id][data-tooltiptext]',
     'picker_file_id_attribute': 'data-id',
-    'picker_select': {'role': 'button', 'name': 'Insert'},
+    'picker_select': {'role': 'button', 'text_regex': r'^(?:Insert|Pievienot)$'},
     'attachments': 'a[href*="drive.google.com/file/d/"], a[href*="drive.google.com/open?"]',
     'posts': '[data-stream-item-id]',
     'post_id_attribute': 'data-stream-item-id',
@@ -41,6 +41,8 @@ def locate(scope, spec):
     if isinstance(spec, str):
         return scope.locator(spec)
     if 'role' in spec:
+        if 'text_regex' in spec:
+            return scope.get_by_role(spec['role']).filter(has_text=re.compile(spec['text_regex']))
         if 'names' in spec:
             pattern = re.compile('^(?:' + '|'.join(re.escape(name) for name in spec['names']) + ')$')
             return scope.get_by_role(spec['role'], name=pattern)
@@ -250,7 +252,11 @@ class ClassroomPage:
         if not file_id or not re.fullmatch(r'[A-Za-z0-9_-]+', file_id):
             raise ValueError('Drive picker did not expose a verifiable file ID. No upload or Copy fallback is allowed.')
         row.click()
-        unique(locate(picker, self.ui['picker_select']), 'Insert existing Drive file').click()
+        # The observed button displays Pievienot but its accessible name also
+        # includes the selected-item count. Match its visible text in the picker.
+        self.wait(lambda: unique(locate(picker, self.ui['picker_select']).filter(visible=True),
+                                 'Insert existing Drive file'),
+                  'Drive selection confirmation did not appear').click()
         self.page.locator(self.ui['picker_frame']).filter(visible=True).wait_for(state='hidden', timeout=self.timeout)
         expected = expected + [{'name': name, 'id': file_id}]
         def verified():

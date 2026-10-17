@@ -34,7 +34,7 @@
     "picker_file_id_attribute": "data-id",
     "picker_select": {
       "role": "button",
-      "name": "Insert"
+      "text_regex": "^(?:Insert|Pievienot)$"
     },
     "attachments": "a[href*=\"drive.google.com/file/d/\"], a[href*=\"drive.google.com/open?\"]",
     "posts": "[data-stream-item-id]",

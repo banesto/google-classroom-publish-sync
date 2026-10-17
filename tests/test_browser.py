@@ -134,6 +134,8 @@ class BrowserTests(unittest.TestCase):
         if url == 'https://docs.google.com/picker':
             picker_html = PICKER.replace('My Drive', 'Mans disks') if self.latvian_direct else PICKER
             if self.grid_picker:
+                picker_html = picker_html.replace('<button id="insert">Insert</button>',
+                    '<button id="insert" aria-label="Pievienot 1 vienumu"><span>Pievienot</span></button>')
                 picker_html = picker_html.replace('id="mydrive"', 'id="mydrive" aria-selected="true"')
                 picker_html = picker_html.replace('<nav aria-label="Breadcrumb">', '<nav>')
                 picker_html = picker_html.replace('<div id="rows">', '<div id="rows" role="listbox">')
