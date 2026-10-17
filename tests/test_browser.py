@@ -435,6 +435,27 @@ class BrowserTests(unittest.TestCase):
             self.run_flow()
         self.assert_blocked(0)
 
+    def test_observed_composer_cover_card_and_open_links(self):
+        self.page.goto(self.pub.url)
+        self.page.locator('#composer').evaluate('''el => {
+          el.hidden = false;
+          el.querySelector('#attachments').innerHTML = `
+            <div data-attachment-id="-123"><div>
+              <a href="https://drive.google.com/open?id=drive2&amp;usp=classroom_web&amp;authuser=2"
+                 title="2.jpg" aria-label="Pielikums: Attēls — 2.jpg"><div>2.jpg</div><div>Attēls</div></a>
+              <span>Rādāmais attēls</span></div></div>
+            <div data-attachment-id="-456"><div>
+              <a href="https://drive.google.com/open?id=drive10&amp;usp=classroom_web&amp;authuser=2"
+                 title="10.jpg" aria-label="Pielikums: Attēls — 10.jpg"><div>10.jpg</div><div>Attēls</div></a>
+            </div></div>`;
+        }''')
+        adapter = ClassroomPage(self.page, self.config)
+        self.assertEqual(adapter.attachments(adapter.composer(), self.pub.names),
+                         [{'name': '2.jpg', 'id': 'drive2'}, {'name': '10.jpg', 'id': 'drive10'}])
+        self.page.locator('[title="2.jpg"]').evaluate("el => el.remove()")
+        with self.assertRaisesRegex(ValueError, 'Effective ui.attachments:'):
+            adapter.attachments(adapter.composer(), self.pub.names)
+
     def test_existing_body_stops_duplicate(self):
         self.posts = [{'id': 'old-post', 'text': self.pub.text, 'files': self.files}]
         with self.assertRaises(ValueError):

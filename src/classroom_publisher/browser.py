@@ -189,7 +189,9 @@ class ClassroomPage:
             else:
                 reason = 'The recognized attachment count or filenames differ from the intended files.'
             raise ValueError(reason + f'\nExpected ({len(expected_names)}): {expected_names!r}'
-                             + f'\nRecognized ({len(observed_names)}): {observed_names!r}')
+                             + f'\nRecognized ({len(observed_names)}): {observed_names!r}'
+                             + f'\nEffective ui.attachments: {self.ui["attachments"]!r}'
+                             + f'\nEffective ui.composer: {self.ui["composer"]!r}')
         if len({a['id'] for a in results}) != len(results):
             raise ValueError('The same Drive file is attached more than once.')
         return sorted(results, key=lambda item: expected_names.index(item['name']))
