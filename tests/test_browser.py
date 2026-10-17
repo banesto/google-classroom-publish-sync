@@ -302,6 +302,19 @@ class BrowserTests(unittest.TestCase):
         self.assertTrue(self.run_flow())
         self.assertEqual(self.post_calls, 1)
 
+    def test_legacy_insert_override_uses_observed_latvian_button(self):
+        self.latvian_direct = True
+        self.grid_picker = True
+        self.config['ui'] = {'picker_select': {'role': 'button', 'name': 'Insert'}}
+        self.assertTrue(self.run_flow())
+        self.assertEqual(self.post_calls, 1)
+
+    def test_missing_confirmation_reports_actual_buttons(self):
+        self.config['ui'] = {'picker_select': {'role': 'button', 'name': 'Missing custom label'}}
+        with self.assertRaisesRegex(ValueError, 'Visible picker buttons:.*Insert'):
+            self.run_flow()
+        self.assert_blocked(0)
+
     def test_grid_root_does_not_accept_missing_nested_breadcrumbs(self):
         self.page.goto(self.pub.url)
         self.page.locator('body').evaluate('''el => el.innerHTML =

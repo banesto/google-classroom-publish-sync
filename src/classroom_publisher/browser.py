@@ -73,6 +73,10 @@ class ClassroomPage:
     def __init__(self, page, config, status=lambda _: None):
         self.page = page
         self.ui = dict(DEFAULT_UI, **config.get('ui', {}))
+        # Older copies of ui.reference.json pinned the English-only default.
+        # Migrate that exact legacy setting; preserve genuine custom selectors.
+        if self.ui['picker_select'] == {'role': 'button', 'name': 'Insert'}:
+            self.ui['picker_select'] = DEFAULT_UI['picker_select']
         self.timeout = config.get('timeout_ms', 20000)
         self.page.set_default_timeout(self.timeout)
         self.status = status
@@ -254,9 +258,17 @@ class ClassroomPage:
         row.click()
         # The observed button displays Pievienot but its accessible name also
         # includes the selected-item count. Match its visible text in the picker.
-        self.wait(lambda: unique(locate(picker, self.ui['picker_select']).filter(visible=True),
-                                 'Insert existing Drive file'),
-                  'Drive selection confirmation did not appear').click()
+        try:
+            confirmation = self.wait(lambda: unique(locate(picker, self.ui['picker_select']).filter(visible=True),
+                                                   'Insert existing Drive file'),
+                                     'Drive selection confirmation did not appear')
+        except ValueError as exc:
+            buttons = picker.get_by_role('button').filter(visible=True)
+            observed = [{'text': button.inner_text().strip(), 'aria-label': button.get_attribute('aria-label')}
+                        for button in buttons.all()]
+            raise ValueError(f'{exc}\nEffective ui.picker_select: {self.ui["picker_select"]!r}'
+                             f'\nVisible picker buttons: {observed!r}') from exc
+        confirmation.click()
         self.page.locator(self.ui['picker_frame']).filter(visible=True).wait_for(state='hidden', timeout=self.timeout)
         expected = expected + [{'name': name, 'id': file_id}]
         def verified():
