@@ -125,10 +125,12 @@ class UI:
                 confirm(folder, url.strip())
                 self.info('Recovered', 'Success marker saved. This folder cannot be published again.')
         elif choice == 'ABSENT':
-            if self.ask('Allow a later retry?', 'Have you confirmed no post exists, and closed every old composer?\n'
+            if self.ask('Allow retry?', 'Have you confirmed no post exists, and closed every old composer?\n'
                         'Only then clear this pending attempt. The next publication will be a new attempt.'):
                 allow_retry(folder)
                 self.info('Ready to retry', 'The reviewed post text is saved and will prefill the next publication dialog.')
+                return True
+        return False
 
     def choose_action(self, config, config_path):
         win = tk.Toplevel(self.root)

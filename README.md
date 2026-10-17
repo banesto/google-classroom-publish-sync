@@ -178,9 +178,9 @@ If a timeout occurs after clicking Post, Google might still have accepted the po
 To recover:
 
 1. Open the app and use **Sign in / inspect class** for the correct child. Inspect the Stream, compare the full text and attachments, and reload. Close any old composer.
-2. Reopen the app, choose **Recover an uncertain attempt**, and select the publication folder.
+2. Choose **Publish to Classroom** on the same folder again: recovery opens automatically and shows the saved status and post text. You can also open the app and choose **Recover an uncertain attempt** manually.
 3. Enter `VERIFIED` only if the complete post exists with the correct author and attachment order; provide its link if available. This creates the success marker from the saved attempt.
-4. Enter `ABSENT` only if you have established that nothing was posted and all old composers are closed. Confirm clearing the attempt to permit a later retry.
+4. Enter `ABSENT` only if you have established that nothing was posted and all old composers are closed. Confirm allowing a retry. When recovery was opened by Publish, the editable publication dialog opens next with the saved description. The normal draft review and final Post confirmation still apply.
 5. If uncertain, cancel. The folder stays blocked.
 
 Do not delete the marker or pending file as a shortcut. A local OS lock prevents concurrent app operations on the same computer. Drive sync is not a distributed lock: **use one publishing computer at a time**. The marker and attempt record sync along with the publication folder.

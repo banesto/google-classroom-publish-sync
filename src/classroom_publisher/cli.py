@@ -3,8 +3,18 @@ import json
 import sys
 from pathlib import Path
 from .config import data_dir, load_config
-from .core import prepare
+from .core import MARKER, PENDING, prepare
 from .locking import single_instance
+
+
+def prepare_for_publish(target, config, base, ui):
+    folder = Path(target).resolve(strict=True)
+    if (folder / PENDING).exists() and not (folder / MARKER).exists():
+        # Recovery must explicitly authorize a retry. Cancellation and VERIFIED
+        # both stop here; never infer permission merely from a missing file.
+        if ui.recover(folder) is not True:
+            return None
+    return prepare(folder, config, base)
 
 
 def main():
@@ -51,7 +61,10 @@ def main():
             elif args.command == 'reconcile':
                 ui.recover(Path(args.target).resolve(strict=True))
             else:
-                pub = prepare(args.target, config, base)
+                pub = (prepare_for_publish(args.target, config, base, ui)
+                       if args.command == 'publish' else prepare(args.target, config, base))
+                if pub is None:
+                    return
                 if args.command == 'validate':
                     text = pub.text + f'\n\nAttachments ({len(pub.names)}):\n' + '\n'.join(pub.names)
                     if ui:
@@ -63,7 +76,7 @@ def main():
                     publish(pub, config, base, ui)
     except (Exception, KeyboardInterrupt) as exc:
         message = str(exc) or 'Cancelled.'
-        message += '\n\nIf an attempt is pending, inspect Classroom and use Recover before retrying.'
+        message += '\n\nIf an attempt is pending, inspect Classroom. Choosing Publish again will open recovery for this folder.'
         if ui:
             ui.error(message)
         elif args.gui:

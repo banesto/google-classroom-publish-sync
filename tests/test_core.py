@@ -2,6 +2,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
+from classroom_publisher.cli import prepare_for_publish
 from classroom_publisher.core import MARKER, PENDING, DRAFT, allow_retry, begin, confirm, prepare
 
 
@@ -47,6 +49,41 @@ class PublicationTests(unittest.TestCase):
             (self.folder / f'extra{i}.jpg').write_bytes(b'test')
         with self.assertRaisesRegex(ValueError, 'maximum 20'):
             self.prepare()
+
+    def test_publish_opens_recovery_and_reuses_saved_text(self):
+        pub = self.prepare()
+        pub.text = 'Saved title and description'
+        begin(pub)
+        ui = Mock()
+        def recover(folder):
+            allow_retry(folder)
+            return True
+        ui.recover.side_effect = recover
+        retry = prepare_for_publish(self.folder, self.config, self.base, ui)
+        self.assertEqual(retry.text, pub.text)
+        ui.recover.assert_called_once_with(self.folder.resolve())
+
+    def test_cancelled_inline_recovery_stops_publication(self):
+        begin(self.prepare())
+        ui = Mock()
+        ui.recover.return_value = False
+        self.assertIsNone(prepare_for_publish(self.folder, self.config, self.base, ui))
+        self.assertTrue((self.folder / PENDING).exists())
+
+    def test_verified_inline_recovery_does_not_republish(self):
+        begin(self.prepare())
+        ui = Mock()
+        def recover(folder):
+            confirm(folder)
+            return False
+        ui.recover.side_effect = recover
+        self.assertIsNone(prepare_for_publish(self.folder, self.config, self.base, ui))
+        self.assertTrue((self.folder / MARKER).exists())
+
+    def test_normal_publish_does_not_open_recovery(self):
+        ui = Mock()
+        self.assertIsNotNone(prepare_for_publish(self.folder, self.config, self.base, ui))
+        ui.recover.assert_not_called()
 
     def test_limit_blocks_without_markers(self):
         for i in range(19):
