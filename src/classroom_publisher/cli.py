@@ -13,6 +13,9 @@ def prepare_for_publish(target, config, base, ui):
         # Retry requires the user's explicit choice after checking Classroom.
         if ui.recover(folder) is not True:
             return None
+        pub = prepare(folder, config, base)
+        pub.text_reviewed = True
+        return pub
     return prepare(folder, config, base)
 
 

@@ -180,7 +180,7 @@ To recover:
 1. Open the app and use **Sign in / inspect class** for the correct child. Inspect the Stream, compare the full text and attachments, and reload. Close any old composer.
 2. Choose **Publish to Classroom** on the same folder again. The recovery dialog shows the saved status and original post text. You can also open **Recover an uncertain attempt** manually.
 3. Click **Retry publishing** only after checking that no post exists and closing old drafts. There are no typed confirmation words or extra confirmation popup.
-4. When opened from Publish, the editable publication dialog comes next, prefilled with the saved title and description. Make amendments, then continue through the normal draft review and final Post confirmation.
+4. Edit the saved title and description directly in the recovery dialog before clicking Retry publishing. When opened from Publish, retry goes straight to preparing the browser draft without a second preparation dialog. Initial publications still show the normal preparation editor. Final browser-draft review and Post confirmation remain required.
 5. Click **Cancel publication** if the post exists, you are unsure, or you want to stop. Cancellation preserves the unresolved record and does not create a success marker. Closing the window has the same effect.
 
 Do not delete the marker or pending file as a shortcut. A local OS lock prevents concurrent app operations on the same computer. Drive sync is not a distributed lock: **use one publishing computer at a time**. The marker and attempt record sync along with the publication folder.

@@ -56,6 +56,7 @@ class Publication:
     names: list
     drive_path: list = field(default_factory=list)
     snapshot: dict = field(default_factory=dict)
+    text_reviewed: bool = False
 
 
 def prepare(folder, config, config_dir):
@@ -104,11 +105,15 @@ def exclusive_write(path, text):
         os.fsync(f.fileno())
 
 
-def allow_retry(folder):
+def allow_retry(folder, text=None):
     """Called only after the operator confirms ABSENT and closes old composers."""
     folder = Path(folder)
     if (folder / MARKER).exists():
         raise ValueError('Already published; cannot allow a retry.')
+    if text is not None:
+        if not text.strip():
+            raise ValueError('Enter some text for the post.')
+        update_pending(folder, text=text.strip())
     # Preserve the complete reviewed text and old metadata atomically. This is
     # a reusable draft, not a pending attempt or evidence of success.
     os.replace(folder / PENDING, folder / DRAFT)

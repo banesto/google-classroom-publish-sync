@@ -57,11 +57,12 @@ class PublicationTests(unittest.TestCase):
         ui = Mock()
         ui.edit.side_effect = lambda pub: pub.text
         def recover(folder):
-            allow_retry(folder)
+            allow_retry(folder, 'Amended retry text')
             return True
         ui.recover.side_effect = recover
         retry = prepare_for_publish(self.folder, self.config, self.base, ui)
-        self.assertEqual(retry.text, pub.text)
+        self.assertEqual(retry.text, 'Amended retry text')
+        self.assertTrue(retry.text_reviewed)
         ui.recover.assert_called_once_with(self.folder.resolve())
         ui.edit.assert_not_called()
         self.assertEqual([call[0] for call in ui.mock_calls], ['recover'])
@@ -88,7 +89,8 @@ class PublicationTests(unittest.TestCase):
     def test_normal_publish_does_not_open_recovery(self):
         ui = Mock()
         ui.edit.side_effect = lambda pub: pub.text
-        self.assertIsNotNone(prepare_for_publish(self.folder, self.config, self.base, ui))
+        pub = prepare_for_publish(self.folder, self.config, self.base, ui)
+        self.assertFalse(pub.text_reviewed)
         ui.recover.assert_not_called()
 
     def test_limit_blocks_without_markers(self):
