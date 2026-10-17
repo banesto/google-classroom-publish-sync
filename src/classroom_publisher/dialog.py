@@ -1,7 +1,7 @@
 """Tk dialogs keep the ordinary workflow usable from Explorer without a terminal."""
 import tkinter as tk
 import sys
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, ttk
 from .icons import icon_path
 
 
@@ -105,31 +105,37 @@ class UI:
 
     def recover(self, folder):
         import json
-        from .core import MARKER, PENDING, confirm, allow_retry
+        from .core import MARKER, PENDING, allow_retry
         if (folder / MARKER).exists():
             raise ValueError('A success marker already exists. Do not clear it or repost.')
         record = json.loads((folder / PENDING).read_text(encoding='utf-8'))
-        self.document('Unresolved attempt — inspect this class in Chrome',
-                      f"Account: {record['email']}\nClass: {record['class_url']}\n"
-                      f"Stage: {record.get('stage', 'unknown')}\n\n{record['text']}\n\n"
-                      + '\n'.join(record['names']) +
-                      '\n\nUse the saved child profile to inspect the Stream. '
-                      'Compare author, text, attachment names/count and order after a reload. '
-                      'Never clear this attempt just because the request timed out.')
-        choice = simpledialog.askstring('Recovery',
-                     'Type VERIFIED if the full post exists, ABSENT if definitely not published,\n'
-                     'or Cancel to keep the attempt blocked.', parent=self.root)
-        if choice == 'VERIFIED':
-            url = simpledialog.askstring('Post link', 'Paste the post link if available (blank is OK).', parent=self.root)
-            if url is not None:
-                confirm(folder, url.strip())
-                self.info('Recovered', 'Success marker saved. This folder cannot be published again.')
-        elif choice == 'ABSENT':
-            if self.ask('Allow retry?', 'Have you confirmed no post exists, and closed every old composer?\n'
-                        'Only then clear this pending attempt. The next publication will be a new attempt.'):
-                allow_retry(folder)
-                self.info('Ready to retry', 'The reviewed post text is saved and will prefill the next publication dialog.')
-                return True
+        win = tk.Toplevel(self.root)
+        win.title('Previous publication attempt')
+        win.geometry('680x440')
+        win.columnconfigure(0, weight=1)
+        win.rowconfigure(1, weight=1)
+        ttk.Label(win, text='Check the class Stream before choosing Retry publishing.\n'
+                  'Retry means no post exists and any old draft is closed.\n'
+                  'If the post exists or you are unsure, choose Cancel publication.',
+                  wraplength=640, padding=12).grid(row=0, column=0, sticky='ew')
+        details = tk.Text(win, wrap='word', height=8)
+        details.grid(row=1, column=0, sticky='nsew', padx=12)
+        details.insert('1.0', f"Account: {record['email']}\nStatus: {record.get('stage', 'unknown')}\n"
+                       f"Class: {record['class_url']}\n\n{record['text']}\n\n" + '\n'.join(record['names']))
+        details.configure(state='disabled')
+        retry = []
+        def choose_retry():
+            retry.append(True)
+            win.destroy()
+        buttons = ttk.Frame(win, padding=12)
+        buttons.grid(row=2, column=0)
+        ttk.Button(buttons, text='Cancel publication', command=win.destroy).pack(side='left', padx=8)
+        ttk.Button(buttons, text='Retry publishing', command=choose_retry).pack(side='left')
+        win.grab_set()
+        self.root.wait_window(win)
+        if retry:
+            allow_retry(folder)
+            return True
         return False
 
     def choose_action(self, config, config_path):

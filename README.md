@@ -178,10 +178,10 @@ If a timeout occurs after clicking Post, Google might still have accepted the po
 To recover:
 
 1. Open the app and use **Sign in / inspect class** for the correct child. Inspect the Stream, compare the full text and attachments, and reload. Close any old composer.
-2. Choose **Publish to Classroom** on the same folder again: the publication editor opens first with the saved text for amendments, followed by recovery showing the original attempt status and text. You can also open the app and choose **Recover an uncertain attempt** manually.
-3. Enter `VERIFIED` only if the complete post exists with the correct author and attachment order; provide its link if available. This creates the success marker from the saved attempt.
-4. Enter `ABSENT` only if you have established that nothing was posted and all old composers are closed. Confirm allowing a retry. When recovery was opened by Publish, your already-reviewed amendments continue into the new attempt without a second editor. Cancelling either dialog stops publication; the original pending text is never overwritten before recovery. The normal draft review and final Post confirmation still apply.
-5. If uncertain, cancel. The folder stays blocked.
+2. Choose **Publish to Classroom** on the same folder again. The recovery dialog shows the saved status and original post text. You can also open **Recover an uncertain attempt** manually.
+3. Click **Retry publishing** only after checking that no post exists and closing old drafts. There are no typed confirmation words or extra confirmation popup.
+4. When opened from Publish, the editable publication dialog comes next, prefilled with the saved title and description. Make amendments, then continue through the normal draft review and final Post confirmation.
+5. Click **Cancel publication** if the post exists, you are unsure, or you want to stop. Cancellation preserves the unresolved record and does not create a success marker. Closing the window has the same effect.
 
 Do not delete the marker or pending file as a shortcut. A local OS lock prevents concurrent app operations on the same computer. Drive sync is not a distributed lock: **use one publishing computer at a time**. The marker and attempt record sync along with the publication folder.
 
@@ -320,4 +320,4 @@ An exact legacy `ui.picker_select` value of `{"role": "button", "name": "Insert"
 
 Publication opens the Drive picker once, navigates to the publication folder once, and selects the intended filenames in natural order using additive selection. It checks that the selected Drive IDs exactly match the intended set before clicking the picker confirmation once. It never uses Select All, which could include metadata files. The resulting draft must still have the expected file IDs and displayed order before Post is allowed; batch selection does not guarantee that Google preserves order.
 
-After the operator confirms `ABSENT` and closes old composers, recovery atomically renames `.classroom-pending.json` to `.classroom-draft.json` instead of deleting its contents. The next publication dialog reuses the complete reviewed title and description. This recovered text takes precedence over generated text and `description.txt` and remains editable. All attachments are freshly validated. A new attempt creates a new pending record; unresolved attempts continue to block retries. The draft is not a success marker, and `classroom-published.txt` remains the only success marker.
+After the operator checks that no post exists, closes old composers, and clicks **Retry publishing**, recovery atomically renames `.classroom-pending.json` to `.classroom-draft.json` instead of deleting its contents. The next publication dialog reuses the complete reviewed title and description. This recovered text takes precedence over generated text and `description.txt` and remains editable. All attachments are freshly validated. A new attempt creates a new pending record; unresolved attempts continue to block retries. The draft is not a success marker, and `classroom-published.txt` remains the only success marker.

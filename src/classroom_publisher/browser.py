@@ -365,7 +365,7 @@ def launch(p, profile, config):
 
 def publish(pub, config, config_dir, ui):
     from playwright.sync_api import sync_playwright
-    text = pub.text if pub.text_reviewed else ui.edit(pub)
+    text = ui.edit(pub)
     if text is None:
         return False
     pub.text = text

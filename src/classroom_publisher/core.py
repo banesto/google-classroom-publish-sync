@@ -56,17 +56,16 @@ class Publication:
     names: list
     drive_path: list = field(default_factory=list)
     snapshot: dict = field(default_factory=dict)
-    text_reviewed: bool = False
 
 
-def prepare(folder, config, config_dir, *, preview_pending=False):
+def prepare(folder, config, config_dir):
     validate_config(config, config_dir)
     folder = Path(folder).resolve(strict=True)
     if not folder.is_dir():
         raise ValueError('Select a publication folder.')
     if (folder / MARKER).exists():
         raise ValueError('Already published: classroom-published.txt exists.')
-    if (folder / PENDING).exists() and not preview_pending:
+    if (folder / PENDING).exists():
         raise ValueError('Unresolved attempt. Inspect Classroom and use Recover; do not retry.')
     matches = []
     for c in config['classes']:
@@ -86,7 +85,7 @@ def prepare(folder, config, config_dir, *, preview_pending=False):
         extra = description.read_text(encoding='utf-8-sig').strip()
         if extra:
             text += '\n\n' + extra
-    draft = folder / (PENDING if preview_pending and (folder / PENDING).exists() else DRAFT)
+    draft = folder / DRAFT
     if draft.exists():
         record = json.loads(draft.read_text(encoding='utf-8'))
         if (record['child'] != c['child'] or record['email'] != child['email'].strip()
