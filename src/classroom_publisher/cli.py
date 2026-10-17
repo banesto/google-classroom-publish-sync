@@ -10,10 +10,20 @@ from .locking import single_instance
 def prepare_for_publish(target, config, base, ui):
     folder = Path(target).resolve(strict=True)
     if (folder / PENDING).exists() and not (folder / MARKER).exists():
+        preview = prepare(folder, config, base, preview_pending=True)
+        amended = ui.edit(preview)
+        if amended is None:
+            return None
         # Recovery must explicitly authorize a retry. Cancellation and VERIFIED
         # both stop here; never infer permission merely from a missing file.
         if ui.recover(folder) is not True:
             return None
+        pub = prepare(folder, config, base)
+        if pub.snapshot != preview.snapshot:
+            raise ValueError('Files changed during review. Please review the publication again.')
+        pub.text = amended
+        pub.text_reviewed = True
+        return pub
     return prepare(folder, config, base)
 
 

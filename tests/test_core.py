@@ -55,6 +55,7 @@ class PublicationTests(unittest.TestCase):
         pub.text = 'Saved title and description'
         begin(pub)
         ui = Mock()
+        ui.edit.side_effect = lambda pub: pub.text
         def recover(folder):
             allow_retry(folder)
             return True
@@ -62,17 +63,42 @@ class PublicationTests(unittest.TestCase):
         retry = prepare_for_publish(self.folder, self.config, self.base, ui)
         self.assertEqual(retry.text, pub.text)
         ui.recover.assert_called_once_with(self.folder.resolve())
+        self.assertTrue(retry.text_reviewed)
+        self.assertEqual([call[0] for call in ui.mock_calls], ['edit', 'recover'])
 
     def test_cancelled_inline_recovery_stops_publication(self):
         begin(self.prepare())
         ui = Mock()
+        ui.edit.side_effect = lambda pub: pub.text
         ui.recover.return_value = False
         self.assertIsNone(prepare_for_publish(self.folder, self.config, self.base, ui))
+        self.assertTrue((self.folder / PENDING).exists())
+
+    def test_amendments_do_not_change_original_pending_record(self):
+        pub = self.prepare()
+        begin(pub)
+        ui = Mock()
+        ui.edit.return_value = 'Amended description'
+        def recover(folder):
+            self.assertEqual(json.loads((folder / PENDING).read_text())['text'], pub.text)
+            allow_retry(folder)
+            return True
+        ui.recover.side_effect = recover
+        retry = prepare_for_publish(self.folder, self.config, self.base, ui)
+        self.assertEqual(retry.text, 'Amended description')
+
+    def test_cancelled_editor_keeps_attempt_blocked(self):
+        begin(self.prepare())
+        ui = Mock()
+        ui.edit.return_value = None
+        self.assertIsNone(prepare_for_publish(self.folder, self.config, self.base, ui))
+        ui.recover.assert_not_called()
         self.assertTrue((self.folder / PENDING).exists())
 
     def test_verified_inline_recovery_does_not_republish(self):
         begin(self.prepare())
         ui = Mock()
+        ui.edit.side_effect = lambda pub: pub.text
         def recover(folder):
             confirm(folder)
             return False
@@ -82,6 +108,7 @@ class PublicationTests(unittest.TestCase):
 
     def test_normal_publish_does_not_open_recovery(self):
         ui = Mock()
+        ui.edit.side_effect = lambda pub: pub.text
         self.assertIsNotNone(prepare_for_publish(self.folder, self.config, self.base, ui))
         ui.recover.assert_not_called()
 
