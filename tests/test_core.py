@@ -34,8 +34,8 @@ class PublicationTests(unittest.TestCase):
         pub.text = 'Edited title\n\nMy previously entered description.'
         begin(pub)
         allow_retry(self.folder)
-        self.assertFalse((self.folder / PENDING).exists())
-        self.assertTrue((self.folder / DRAFT).exists())
+        self.assertEqual(json.loads((self.folder / PENDING).read_text())['stage'], 'retry_ready')
+        self.assertFalse((self.folder / DRAFT).exists())
         retry = self.prepare()
         self.assertEqual(retry.text, pub.text)
         begin(retry)
@@ -49,6 +49,25 @@ class PublicationTests(unittest.TestCase):
             (self.folder / f'extra{i}.jpg').write_bytes(b'test')
         with self.assertRaisesRegex(ValueError, 'maximum 20'):
             self.prepare()
+
+    def test_legacy_draft_is_migrated_to_single_metadata_file(self):
+        pub = self.prepare()
+        begin(pub)
+        (self.folder / PENDING).rename(self.folder / DRAFT)
+        retry = self.prepare()
+        self.assertEqual(retry.text, pub.text)
+        self.assertTrue((self.folder / PENDING).exists())
+        self.assertFalse((self.folder / DRAFT).exists())
+        begin(retry)
+        with self.assertRaisesRegex(ValueError, 'Unresolved'):
+            self.prepare()
+
+    def test_pending_attempt_wins_over_legacy_draft(self):
+        begin(self.prepare())
+        (self.folder / DRAFT).write_text('{"text":"stale"}')
+        with self.assertRaisesRegex(ValueError, 'Unresolved'):
+            self.prepare()
+        self.assertFalse((self.folder / DRAFT).exists())
 
     def test_publish_opens_recovery_and_reuses_saved_text(self):
         pub = self.prepare()

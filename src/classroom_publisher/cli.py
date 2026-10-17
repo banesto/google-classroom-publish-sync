@@ -3,13 +3,15 @@ import json
 import sys
 from pathlib import Path
 from .config import data_dir, load_config
-from .core import MARKER, PENDING, prepare
+from .core import MARKER, PENDING, prepare, migrate_metadata
 from .locking import single_instance
 
 
 def prepare_for_publish(target, config, base, ui):
     folder = Path(target).resolve(strict=True)
-    if (folder / PENDING).exists() and not (folder / MARKER).exists():
+    migrate_metadata(folder)
+    if ((folder / PENDING).exists() and not (folder / MARKER).exists()
+            and json.loads((folder / PENDING).read_text(encoding='utf-8')).get('stage') != 'retry_ready'):
         # Retry requires the user's explicit choice after checking Classroom.
         if ui.recover(folder) is not True:
             return None

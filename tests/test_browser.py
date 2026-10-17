@@ -374,11 +374,10 @@ class BrowserTests(unittest.TestCase):
             self.run_flow()
         self.assert_blocked(0)
 
-    def test_reordered_attachments_stop(self):
+    def test_reordered_attachments_are_accepted(self):
         self.reorder = True
-        with self.assertRaisesRegex(ValueError, 'All intended files were recognized'):
-            self.run_flow()
-        self.assert_blocked(0)
+        self.assertTrue(self.run_flow())
+        self.assertEqual(self.post_calls, 1)
 
     def test_metadata_in_picker_is_not_selected(self):
         self.files.extend([{'name': '.classroom-pending.json', 'id': 'pendingmetadata'},

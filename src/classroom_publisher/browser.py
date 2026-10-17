@@ -161,18 +161,16 @@ class ClassroomPage:
                 raise ValueError('Cannot uniquely identify an attachment filename; inspect UI settings.')
             results.append({'name': names.pop(), 'id': drive_id(link.get_attribute('href') or '')})
         observed_names = [a['name'] for a in results]
-        if observed_names != expected_names:
+        if sorted(observed_names) != sorted(expected_names):
             if not results:
                 reason = 'No Drive attachment links were recognized. The composer markup may differ from the configured selector.'
-            elif sorted(observed_names) == sorted(expected_names):
-                reason = 'All intended files were recognized, but their displayed order differs from natural filename order.'
             else:
                 reason = 'The recognized attachment count or filenames differ from the intended files.'
             raise ValueError(reason + f'\nExpected ({len(expected_names)}): {expected_names!r}'
                              + f'\nRecognized ({len(observed_names)}): {observed_names!r}')
         if len({a['id'] for a in results}) != len(results):
             raise ValueError('The same Drive file is attached more than once.')
-        return results
+        return sorted(results, key=lambda item: expected_names.index(item['name']))
 
     def open_draft(self, pub):
         # Existing loaded posts with the same complete body are a possible duplicate.
@@ -344,7 +342,7 @@ class ClassroomPage:
                     url = candidate
             except ValueError:
                 pass  # Post URL is optional; never fabricate one from a Stream ID.
-        confirm(pub.folder, url, 'browser verified new stable post ID, text and ordered Drive IDs after reload')
+        confirm(pub.folder, url, 'browser verified new stable post ID, text and matching Drive IDs after reload')
         return post_id
 
 

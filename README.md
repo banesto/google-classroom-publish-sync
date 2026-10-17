@@ -11,9 +11,9 @@ A Python desktop application that publishes a student's Google Classroom **Strea
 3. It validates the folder before opening Chrome, builds the post text, and shows an editable review dialog.
 4. Playwright opens that child's dedicated saved browser profile. Your normal Chrome account is irrelevant; no browser needs to remain open between publications.
 5. The app checks the signed-in email and class URL, opens the Stream composer, and fills the reviewed text.
-6. It opens **Google Drive** in the attachment picker, follows the configured folder path, and adds each existing file one at a time in natural filename order. It checks picker breadcrumbs and file IDs against the links added to the draft.
+6. It opens **Google Drive** in the attachment picker, follows the configured folder path, and selects the intended files in natural filename order and attaches them together. It checks picker breadcrumbs and file IDs against the links added to the draft.
 7. You review the prepared browser draft and confirm publication in a dialog. The app clicks Post once.
-8. It finds a new stable Stream item ID with the matching text and ordered attachment IDs, reloads the page, and verifies the same item again.
+8. It finds a new stable Stream item ID with the matching text and attachment IDs, reloads the page, and verifies the same item again.
 9. Only then does it create `classroom-published.txt` and close its Chrome window.
 
 Python runs the application, file validation, dialogs, and publication tracking. Playwright is the Python library that controls Chrome. The program has **no attachment-upload code**, does not read image/PDF contents, and does not use Google REST APIs or OAuth credentials. It never selects Upload or a permission prompt's Copy option. Google Drive for desktop must finish syncing the original files beforehand.
@@ -155,7 +155,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\repair-shortcu
 
 This recreates the shortcut with the selected chalkboard-book icon (option 2), using an unquoted icon location and a separate local icon file to avoid the old cached path. It preserves configuration and saved logins and does not reinstall dependencies. Press F5 on the desktop if the old image remains. The repair script also accepts `-ShortcutIcon` with the options above.
 
-The review window shows the child, class URL, remote folder path, and ordered attachment names. Wrong-account, missing-file, ambiguous-file, changed-file, reordered-attachment, and uncertain-post checks stop the process. The application does not delete a potentially faulty post automatically.
+The review window shows the child, class URL, remote folder path, and ordered attachment names. Wrong-account, missing-file, ambiguous-file, changed-file, and uncertain-post checks stop the process. The application does not delete a potentially faulty post automatically.
 
 ## Success markers and recovery
 
@@ -214,7 +214,7 @@ Required observations before calling this ready for everyday use:
 - Teacher permits student Stream posts.
 - Online folder breadcrumbs correspond to the configured local folder.
 - Picker exposes a stable Drive file ID that agrees with the resulting attachment link.
-- Exact filenames and ordering match in draft and persisted post.
+- Exact filenames and Drive IDs match in draft and persisted post; displayed order may differ.
 - Stream items expose stable IDs and full post text after reload.
 - No Upload or Copy path is used.
 
@@ -295,7 +295,7 @@ macOS/Linux equivalent:
 CLASSROOM_BROWSER_TESTS=1 python -m unittest discover -s tests -v
 ```
 
-All fixture browser requests are intercepted. These tests exercise the full two-file selection → one Post click → reload → success marker flow, plus wrong account, missing/duplicate files, order mismatch, changed local files, existing post, cancellation, missing persisted post, wrong persisted Drive ID, and a network failure after acceptance. They do not access Google or publish real content. Windows installer/Explorer behavior and the Tk dialogs still require a Windows 11 smoke test.
+All fixture browser requests are intercepted. These tests exercise the full two-file selection → one Post click → reload → success marker flow, plus wrong account, missing/duplicate files, accepted display reordering, changed local files, existing post, cancellation, missing persisted post, wrong persisted Drive ID, and a network failure after acceptance. They do not access Google or publish real content. Windows installer/Explorer behavior and the Tk dialogs still require a Windows 11 smoke test.
 
 References: [Google's student Stream workflow](https://support.google.com/edu/classroom/answer/6020274?co=GENIE.Platform%3DDesktop&hl=en), [Playwright persistent browser contexts](https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch-persistent-context).
 
@@ -318,6 +318,6 @@ An exact legacy `ui.picker_select` value of `{"role": "button", "name": "Insert"
 
 ### Batch attachments and recovered descriptions
 
-Publication opens the Drive picker once, navigates to the publication folder once, and selects the intended filenames in natural order using additive selection. It checks that the selected Drive IDs exactly match the intended set before clicking the picker confirmation once. It never uses Select All, which could include metadata files. The resulting draft must still have the expected file IDs and displayed order before Post is allowed; batch selection does not guarantee that Google preserves order.
+Publication opens the Drive picker once, navigates to the publication folder once, and selects the intended filenames in natural order using additive selection. It checks that the selected Drive IDs exactly match the intended set before clicking the picker confirmation once. It never uses Select All, which could include metadata files. The resulting draft must have exactly the expected filenames and Drive IDs before Post is allowed. Displayed order is ignored; natural sorting is retained for selection and metadata.
 
-After the operator checks that no post exists, closes old composers, and clicks **Retry publishing**, recovery atomically renames `.classroom-pending.json` to `.classroom-draft.json` instead of deleting its contents. The next publication dialog reuses the complete reviewed title and description. This recovered text takes precedence over generated text and `description.txt` and remains editable. All attachments are freshly validated. A new attempt creates a new pending record; unresolved attempts continue to block retries. The draft is not a success marker, and `classroom-published.txt` remains the only success marker.
+After the operator checks that no post exists, closes old composers, and clicks **Retry publishing**, the same `.classroom-pending.json` stores the reviewed text with stage `retry_ready`. A new attempt resets its stage to `preparing`; any other unresolved stage blocks automatic retries. No separate draft file is created. Existing `.classroom-draft.json` files are migrated automatically; an existing pending record takes precedence. All attachments are freshly validated. JSON files are never supported attachments. `classroom-published.txt` remains the only success marker.

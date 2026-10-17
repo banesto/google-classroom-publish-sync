@@ -66,7 +66,8 @@ def prepare(folder, config, config_dir):
         raise ValueError('Select a publication folder.')
     if (folder / MARKER).exists():
         raise ValueError('Already published: classroom-published.txt exists.')
-    if (folder / PENDING).exists():
+    migrate_metadata(folder)
+    if (folder / PENDING).exists() and json.loads((folder / PENDING).read_text(encoding='utf-8')).get('stage') != 'retry_ready':
         raise ValueError('Unresolved attempt. Inspect Classroom and use Recover; do not retry.')
     matches = []
     for c in config['classes']:
@@ -86,7 +87,7 @@ def prepare(folder, config, config_dir):
         extra = description.read_text(encoding='utf-8-sig').strip()
         if extra:
             text += '\n\n' + extra
-    draft = folder / DRAFT
+    draft = folder / PENDING
     if draft.exists():
         record = json.loads(draft.read_text(encoding='utf-8'))
         if (record['child'] != c['child'] or record['email'] != child['email'].strip()
@@ -105,6 +106,18 @@ def exclusive_write(path, text):
         os.fsync(f.fileno())
 
 
+def migrate_metadata(folder):
+    """Consolidate legacy drafts; an existing pending attempt stays authoritative."""
+    folder = Path(folder)
+    legacy = folder / DRAFT
+    if legacy.exists():
+        if not (folder / PENDING).exists() and not (folder / MARKER).exists():
+            os.replace(legacy, folder / PENDING)
+            update_pending(folder, stage='retry_ready')
+        else:
+            legacy.unlink()
+
+
 def allow_retry(folder, text=None):
     """Called only after the operator confirms ABSENT and closes old composers."""
     folder = Path(folder)
@@ -114,9 +127,9 @@ def allow_retry(folder, text=None):
         if not text.strip():
             raise ValueError('Enter some text for the post.')
         update_pending(folder, text=text.strip())
-    # Preserve the complete reviewed text and old metadata atomically. This is
-    # a reusable draft, not a pending attempt or evidence of success.
-    os.replace(folder / PENDING, folder / DRAFT)
+    update_pending(folder, stage='retry_ready')
+    if (folder / DRAFT).exists():
+        (folder / DRAFT).unlink()
 
 
 def begin(pub):
@@ -125,7 +138,13 @@ def begin(pub):
     record = {'started_at': datetime.now().astimezone().isoformat(), 'stage': 'preparing',
               'child': pub.child, 'email': pub.email, 'class_url': pub.url, 'text': pub.text,
               'names': pub.names, 'drive_path': pub.drive_path, 'snapshot': pub.snapshot}
-    exclusive_write(pub.folder / PENDING, json.dumps(record, ensure_ascii=False, indent=2))
+    if (pub.folder / PENDING).exists():
+        old = json.loads((pub.folder / PENDING).read_text(encoding='utf-8'))
+        if old.get('stage') != 'retry_ready':
+            raise FileExistsError('Unresolved publication attempt.')
+        update_pending(pub.folder, **record, attachments=[], baseline_post_ids=[])
+    else:
+        exclusive_write(pub.folder / PENDING, json.dumps(record, ensure_ascii=False, indent=2))
 
 
 def update_pending(folder, **changes):
