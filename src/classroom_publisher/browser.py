@@ -354,7 +354,6 @@ class ClassroomPage:
         if not button.is_enabled():
             raise ValueError('Post button is disabled.')
         update_pending(pub.folder, stage='posting', attachments=expected, baseline_post_ids=baseline)
-        self.status('Publishing once; waiting for confirmation…')
         button.click(timeout=self.timeout)  # Never retry this mutation, including on timeout.
         post_id, _ = self.wait(lambda: self.find_published(pub, expected, baseline), 'Post outcome is uncertain')
         update_pending(pub.folder, stage='verifying', observed_post_id=post_id)
