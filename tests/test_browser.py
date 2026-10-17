@@ -82,6 +82,7 @@ function render(){
     chosen=[]; container.querySelectorAll('[aria-selected]').forEach(el=>el.setAttribute('aria-selected','false'));
    }
    chosen.push(item); row.setAttribute('aria-selected','true');
+   document.querySelector('#insert').setAttribute('aria-label', 'Pievienot '+chosen.length+' vienumi');
  }; container.append(row);
  }
 }
@@ -131,6 +132,7 @@ class BrowserTests(unittest.TestCase):
         self.reload_mutation = False
         self.latvian_direct = False
         self.grid_picker = False
+        self.delayed_selection = False
         self.page = self.browser.new_page()
         self.addCleanup(self.page.close)
         self.page.route('**/*', self.route)
@@ -152,6 +154,8 @@ class BrowserTests(unittest.TestCase):
                     b.dataset.id=nav.children.length ? 'folder'+(nav.children.length-1) : 'root';
                     nav.append(b);""")
                 picker_html = picker_html.replace("row.setAttribute('role','row');", "row.setAttribute('role','option'); row.dataset.target='doc';")
+            if self.delayed_selection:
+                picker_html = picker_html.replace('row.onclick=(event)=>{', 'row.onclick=(event)=>{ setTimeout(()=>{').replace('}; container.append(row);', '}, 180); }; container.append(row);')
             route.fulfill(content_type='text/html', body=picker_html.replace('FILES', json.dumps(self.files))
                           .replace('FOLDERPATH', json.dumps(self.pub.drive_path)))
         elif url.endswith('/fixture/publish'):
@@ -425,6 +429,12 @@ class BrowserTests(unittest.TestCase):
     def test_metadata_in_picker_is_not_selected(self):
         self.files.extend([{'name': '.classroom-pending.json', 'id': 'pendingmetadata'},
                            {'name': '.classroom-draft.json', 'id': 'draftmetadata'}])
+        self.assertTrue(self.run_flow())
+        self.assertEqual([item['id'] for item in self.posts[0]['files']], ['drive2', 'drive10'])
+        self.assertEqual(self.picker_visits, 1)
+
+    def test_batch_selection_waits_for_each_async_update(self):
+        self.delayed_selection = True
         self.assertTrue(self.run_flow())
         self.assertEqual([item['id'] for item in self.posts[0]['files']], ['drive2', 'drive10'])
         self.assertEqual(self.picker_visits, 1)

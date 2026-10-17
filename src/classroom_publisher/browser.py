@@ -281,6 +281,13 @@ class ClassroomPage:
                 return True
             self.wait(verified_folder, 'Could not verify Drive folder ' + folder)
         expected = []
+        def selection_matches():
+            selected = locate(picker, self.ui['picker_rows']).filter(visible=True)
+            ids = [item.get_attribute(self.ui['picker_file_id_attribute']) for item in selected.all()
+                   if item.get_attribute('aria-selected') == 'true']
+            if len(ids) != len(expected) or set(ids) != {item['id'] for item in expected}:
+                raise ValueError('Picker selection differs from the intended Drive files.')
+            return True
         for name in pub.names:
             row = self.wait(lambda: self.exact_row(picker, name), 'Missing or ambiguous Drive file ' + name)
             file_id = row.get_attribute(self.ui['picker_file_id_attribute'])
@@ -290,13 +297,7 @@ class ClassroomPage:
                 raise ValueError('The same Drive file is listed more than once.')
             row.click(modifiers=['ControlOrMeta'] if expected else [])
             expected.append({'name': name, 'id': file_id})
-        def selection_matches():
-            selected = locate(picker, self.ui['picker_rows']).filter(visible=True)
-            ids = [item.get_attribute(self.ui['picker_file_id_attribute']) for item in selected.all()
-                   if item.get_attribute('aria-selected') == 'true']
-            if len(ids) != len(expected) or set(ids) != {item['id'] for item in expected}:
-                raise ValueError('Picker selection differs from the intended Drive files.')
-            return True
+            self.wait(selection_matches, 'Picker did not retain selection after selecting ' + name)
         self.wait(selection_matches, 'Could not verify the complete picker selection')
         # The observed button displays Pievienot but its accessible name also
         # includes the selected-item count. Match its visible text in the picker.
@@ -310,6 +311,14 @@ class ClassroomPage:
                         for button in buttons.all()]
             raise ValueError(f'{exc}\nEffective ui.picker_select: {self.ui["picker_select"]!r}'
                              f'\nVisible picker buttons: {observed!r}') from exc
+        def ready_to_insert():
+            selection_matches()
+            label = confirmation.get_attribute('aria-label') or ''
+            count = re.search(r'\b(\d+)\b', label)
+            if count and int(count[1]) != len(expected):
+                raise ValueError(f'Picker confirmation reports {count[1]} selected items; expected {len(expected)}.')
+            return confirmation.is_enabled()
+        self.wait(ready_to_insert, 'Picker selection and confirmation count disagree')
         confirmation.click()
         self.page.locator(self.ui['picker_frame']).filter(visible=True).wait_for(state='hidden', timeout=self.timeout)
         def verified():
