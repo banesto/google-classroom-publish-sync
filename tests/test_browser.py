@@ -8,8 +8,8 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from classroom_publisher.browser import ClassroomPage, run_publication
-from classroom_publisher.core import MARKER, PENDING, begin, prepare
+from classroom_publisher.browser import ClassroomPage, run_publication, verify_existing_page
+from classroom_publisher.core import MARKER, PENDING, begin, prepare, update_pending
 
 CLASSROOM = r'''<!doctype html><html><head><meta charset="utf-8"></head><body>
 <a aria-label="Google Account: Child (ACCOUNT)">Account</a>
@@ -179,8 +179,8 @@ class BrowserTests(unittest.TestCase):
         else:
             route.abort()  # Fixture cannot reach real Google or download anything.
 
-    def run_flow(self, review=lambda pub: True):
-        return run_publication(self.page, self.pub, self.config, review)
+    def run_flow(self):
+        return run_publication(self.page, self.pub, self.config)
 
     def account_page(self):
         self.page.goto(self.pub.url)
@@ -379,6 +379,49 @@ class BrowserTests(unittest.TestCase):
         self.assertTrue(self.run_flow())
         self.assertEqual(self.post_calls, 1)
 
+    def test_observed_nested_post_and_duplicate_card_links(self):
+        self.page.goto(self.pub.url)
+        self.page.locator('#stream').evaluate(r'''(el, text) => {
+          el.innerHTML = `<div data-stream-item-id="observed-post">
+            <div data-stream-item-id="observed-post"><button>Menu</button></div>
+            <div class="body pco8Kc"></div>
+            <div data-stream-item-id="observed-post">
+              <a href="https://drive.google.com/file/d/drive2/view" aria-label="Pielikums: 2.jpg"><img></a>
+              <div data-attachment-id="card10">
+                <a href="https://drive.google.com/file/d/drive10/view" aria-label="Pielikums: Attēls — 10.jpg"><img></a>
+                <a href="https://drive.google.com/file/d/drive10/view" title="10.jpg">10.jpg</a>
+              </div>
+            </div></div>`;
+          for (const line of text.split('\n')) {
+            const span = document.createElement('span'); span.textContent = line;
+            el.querySelector('.body').append(span, document.createElement('br'));
+          }
+        }''', self.pub.text)
+        adapter = ClassroomPage(self.page, self.config)
+        self.assertEqual(adapter.post_ids(), ['observed-post'])
+        expected = [{'name': '2.jpg', 'id': 'drive2'}, {'name': '10.jpg', 'id': 'drive10'}]
+        self.assertEqual(adapter.find_published(self.pub, expected, [])[0], 'observed-post')
+        self.page.locator('[title="10.jpg"]').evaluate("el => el.href='https://drive.google.com/file/d/wrong/view'")
+        with self.assertRaisesRegex(ValueError, 'card disagree'):
+            adapter.find_published(self.pub, expected, [])
+
+    def test_recover_existing_post_without_post_click(self):
+        self.posts = [{'id': 'already-posted', 'text': self.pub.text, 'files': self.files}]
+        expected = [{'name': item['name'], 'id': item['id']} for item in self.files]
+        update_pending(self.folder, stage='posting', attachments=expected, baseline_post_ids=[])
+        record = json.loads((self.folder / PENDING).read_text())
+        verify_existing_page(self.page, self.folder, self.config, record)
+        self.assertTrue((self.folder / MARKER).exists())
+        self.assertEqual(self.post_calls, 0)
+        self.assertEqual(self.picker_visits, 0)
+
+    def test_recovery_missing_post_stays_uncertain_without_retry(self):
+        update_pending(self.folder, stage='posting', attachments=self.files, baseline_post_ids=[])
+        record = json.loads((self.folder / PENDING).read_text())
+        with self.assertRaisesRegex(ValueError, 'Existing post could not be verified'):
+            verify_existing_page(self.page, self.folder, self.config, record)
+        self.assert_blocked(0)
+
     def test_metadata_in_picker_is_not_selected(self):
         self.files.extend([{'name': '.classroom-pending.json', 'id': 'pendingmetadata'},
                            {'name': '.classroom-draft.json', 'id': 'draftmetadata'}])
@@ -398,16 +441,15 @@ class BrowserTests(unittest.TestCase):
             self.run_flow()
         self.assert_blocked(0)
 
-    def test_cancelling_draft_never_posts(self):
-        self.assertFalse(self.run_flow(lambda pub: False))
-        self.assert_blocked(0)
-
     def test_changed_local_file_stops_before_post(self):
-        def review(pub):
-            (pub.folder / '2.jpg').write_bytes(b'changed')
-            return True
-        with self.assertRaises(ValueError):
-            self.run_flow(review)
+        from unittest.mock import patch
+        original = ClassroomPage.attach
+        def changed(adapter, pub):
+            result = original(adapter, pub)
+            (pub.folder / pub.names[0]).write_bytes(b'changed')
+            return result
+        with patch.object(ClassroomPage, 'attach', changed), self.assertRaises(ValueError):
+            self.run_flow()
         self.assert_blocked(0)
 
     def test_disappearing_post_after_reload_is_uncertain(self):

@@ -13,7 +13,12 @@ def prepare_for_publish(target, config, base, ui):
     if ((folder / PENDING).exists() and not (folder / MARKER).exists()
             and json.loads((folder / PENDING).read_text(encoding='utf-8')).get('stage') != 'retry_ready'):
         # Retry requires the user's explicit choice after checking Classroom.
-        if ui.recover(folder) is not True:
+        outcome = ui.recover(folder)
+        if outcome == 'verify':
+            from .browser import verify_existing
+            verify_existing(folder, config, base, ui)
+            return None
+        if outcome is not True:
             return None
         pub = prepare(folder, config, base)
         pub.text_reviewed = True
@@ -63,7 +68,10 @@ def main():
                 from .browser import sign_in
                 sign_in(args.target, config, base, ui, inspect=args.command == 'inspect')
             elif args.command == 'reconcile':
-                ui.recover(Path(args.target).resolve(strict=True))
+                folder = Path(args.target).resolve(strict=True)
+                if ui.recover(folder) == 'verify':
+                    from .browser import verify_existing
+                    verify_existing(folder, config, base, ui)
             else:
                 pub = (prepare_for_publish(args.target, config, base, ui)
                        if args.command == 'publish' else prepare(args.target, config, base))

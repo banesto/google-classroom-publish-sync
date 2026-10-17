@@ -92,16 +92,10 @@ class UI:
         buttons = ttk.Frame(win, padding=12)
         buttons.grid(row=4, column=0)
         ttk.Button(buttons, text='Cancel', command=win.destroy).pack(side='left', padx=8)
-        ttk.Button(buttons, text='Prepare in Classroom', command=accept).pack(side='left')
+        ttk.Button(buttons, text='Publish to Classroom', command=accept).pack(side='left')
         win.grab_set()
         self.root.wait_window(win)
         return result[0] if result else None
-
-    def review_draft(self, pub):
-        return self.ask('Publish to Classroom?',
-                        f'The draft for {pub.email} has {len(pub.names)} verified Drive attachments.\n\n'
-                        'Review the visible browser draft. Publish this post now?\n\n'
-                        'Choose No to stop. Do not click Post in Chrome yourself.')
 
     def recover(self, folder):
         import json
@@ -129,6 +123,10 @@ class UI:
         for name in record['names']:
             names.insert('end', name)
         retry = []
+        verify = []
+        def choose_verify():
+            verify.append(True)
+            win.destroy()
         def choose_retry():
             text = details.get('1.0', 'end-1c').strip()
             if not text:
@@ -140,8 +138,12 @@ class UI:
         buttons.grid(row=4, column=0)
         ttk.Button(buttons, text='Cancel publication', command=win.destroy).pack(side='left', padx=8)
         ttk.Button(buttons, text='Retry publishing', command=choose_retry).pack(side='left')
+        if record.get('stage') in ('posting', 'verifying'):
+            ttk.Button(buttons, text='Verify existing post', command=choose_verify).pack(side='left', padx=8)
         win.grab_set()
         self.root.wait_window(win)
+        if verify:
+            return 'verify'
         if retry:
             allow_retry(folder, retry[0])
             return True

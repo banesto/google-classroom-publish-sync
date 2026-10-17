@@ -37,7 +37,7 @@
       "text_regex": "^(?:Insert|Pievienot)$"
     },
     "attachments": "a[href*=\"drive.google.com/file/d/\"], a[href*=\"drive.google.com/open?\"]",
-    "posts": "[data-stream-item-id]",
+    "posts": "[data-stream-item-id]:not([data-stream-item-id] [data-stream-item-id])",
     "post_id_attribute": "data-stream-item-id",
     "post_link": "a[href*=\"/p/\"]",
     "drive_direct": {

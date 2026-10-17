@@ -26,7 +26,7 @@ DEFAULT_UI = {
     'picker_file_id_attribute': 'data-id',
     'picker_select': {'role': 'button', 'text_regex': r'^(?:Insert|Pievienot)$'},
     'attachments': 'a[href*="drive.google.com/file/d/"], a[href*="drive.google.com/open?"]',
-    'posts': '[data-stream-item-id]',
+    'posts': '[data-stream-item-id]:not([data-stream-item-id] [data-stream-item-id])',
     'post_id_attribute': 'data-stream-item-id',
     'post_link': 'a[href*="/p/"]',
 }
@@ -73,6 +73,8 @@ class ClassroomPage:
     def __init__(self, page, config, status=lambda _: None):
         self.page = page
         self.ui = dict(DEFAULT_UI, **config.get('ui', {}))
+        if self.ui['posts'] == '[data-stream-item-id]':
+            self.ui['posts'] = DEFAULT_UI['posts']
         # Older copies of ui.reference.json pinned the English-only default.
         # Migrate that exact legacy setting; preserve genuine custom selectors.
         if self.ui['picker_select'] == {'role': 'button', 'name': 'Insert'}:
@@ -147,19 +149,39 @@ class ClassroomPage:
         if self.ui.get('post_text'):
             body = unique(locate(post, self.ui['post_text']), 'Published post text')
             return normalized_text(body.inner_text()) == normalized_text(text)
+        # Observed Stream body container: title and description may be split
+        # across separate spans, so exact text-node lookup cannot match both.
+        observed_body = post.locator('.pco8Kc')
+        if observed_body.count():
+            body = unique(observed_body, 'Published post text')
+            return normalized_text(body.inner_text()) == normalized_text(text)
         # Playwright exact text matching normalizes rendered whitespace.
         return post.get_by_text(normalized_text(text), exact=True).count() == 1
 
-    def attachments(self, scope, expected_names):
+    def attachments(self, scope, expected_names, published=False):
         results = []
+        seen_cards = {}
         for link in locate(scope, self.ui['attachments']).all():
             candidates = [link.get_attribute('title') or '', link.get_attribute('aria-label') or '']
             candidates += link.inner_text().splitlines()
+            if published:
+                candidates += [re.sub(r'^Pielikums:\s*(?:Attēls\s*—\s*)?', '', value)
+                               for value in list(candidates)]
             names = {name for name in expected_names if name in [c.strip() for c in candidates]
                      or link.get_by_text(name, exact=True).count() == 1}
             if len(names) != 1:
                 raise ValueError('Cannot uniquely identify an attachment filename; inspect UI settings.')
-            results.append({'name': names.pop(), 'id': drive_id(link.get_attribute('href') or '')})
+            item = {'name': names.pop(), 'id': drive_id(link.get_attribute('href') or '')}
+            if published:
+                card = link.locator('xpath=ancestor::*[@data-attachment-id][1]')
+                if card.count() == 1:
+                    card_id = card.get_attribute('data-attachment-id')
+                    if card_id in seen_cards:
+                        if seen_cards[card_id] != item:
+                            raise ValueError('Links within a published attachment card disagree.')
+                        continue
+                    seen_cards[card_id] = item
+            results.append(item)
         observed_names = [a['name'] for a in results]
         if sorted(observed_names) != sorted(expected_names):
             if not results:
@@ -308,7 +330,7 @@ class ClassroomPage:
         for post in locate(self.page, self.ui['posts']).all():
             post_id = post.get_attribute(self.ui['post_id_attribute'])
             if post_id and post_id not in baseline and self.text_matches(post, pub.text):
-                if self.attachments(post, pub.names) == expected:
+                if self.attachments(post, pub.names, published=True) == expected:
                     matches.append((post_id, post))
         if len(matches) != 1:
             raise ValueError('Cannot uniquely confirm a new post with the complete text and all Drive attachments.')
@@ -346,7 +368,7 @@ class ClassroomPage:
         return post_id
 
 
-def run_publication(page, pub, config, review_draft, status=lambda _: None):
+def run_publication(page, pub, config, status=lambda _: None):
     """Shared by the real browser and isolated browser-fixture integration tests."""
     adapter = ClassroomPage(page, config, status)
     page.goto(pub.url, wait_until='domcontentloaded')
@@ -356,8 +378,6 @@ def run_publication(page, pub, config, review_draft, status=lambda _: None):
     expected = adapter.attach(pub)
     update_pending(pub.folder, stage='draft_ready', attachments=expected, baseline_post_ids=baseline)
     adapter.draft_matches(pub, expected)
-    if not review_draft(pub):
-        return False  # Keep pending: a human may have interacted with the visible browser.
     adapter.post_once(pub, expected, baseline)
     return True
 
@@ -366,6 +386,42 @@ def launch(p, profile, config):
     profile.mkdir(parents=True, exist_ok=True)
     return p.chromium.launch_persistent_context(str(profile), channel=config.get('browser_channel', 'chrome'),
                                                headless=False, accept_downloads=False)
+
+
+def verify_existing_page(page, folder, config, record):
+    from types import SimpleNamespace
+    if record.get('stage') not in ('posting', 'verifying') or not record.get('attachments') or 'baseline_post_ids' not in record:
+        raise ValueError('This attempt lacks the saved post-click evidence needed for automatic verification.')
+    pub = SimpleNamespace(folder=folder, email=record['email'], url=record['class_url'],
+                          text=record['text'], names=record['names'])
+    if config['children'][record['child']]['email'].strip() != pub.email:
+        raise ValueError('Saved attempt account differs from configuration.')
+    adapter = ClassroomPage(page, config)
+    ids = []
+    for _ in range(2):
+        page.goto(pub.url, wait_until='domcontentloaded')
+        adapter.wait(lambda: adapter.identity(pub), 'Cannot verify the active account')
+        post_id, _ = adapter.wait(lambda: adapter.find_published(
+            pub, record['attachments'], record['baseline_post_ids']), 'Existing post could not be verified')
+        ids.append(post_id)
+    if ids[0] != ids[1]:
+        raise ValueError('Post identity changed during verification.')
+    confirm(folder, verification='browser verified existing post ID, complete text and Drive IDs across two loads')
+
+
+def verify_existing(folder, config, base, ui):
+    """Read-only recovery of an attempt that already clicked Post; never retries it."""
+    import json
+    from playwright.sync_api import sync_playwright
+    from .core import PENDING
+    record = json.loads((folder / PENDING).read_text(encoding='utf-8'))
+    with sync_playwright() as p:
+        context = launch(p, profile_path(record['child'], config, base), config)
+        try:
+            verify_existing_page(context.new_page(), folder, config, record)
+            ui.info('Publication verified', 'The existing post was verified. No new post was created.')
+        finally:
+            context.close()
 
 
 def publish(pub, config, config_dir, ui):
@@ -380,7 +436,7 @@ def publish(pub, config, config_dir, ui):
         context = launch(p, pub.profile, config)
         try:
             page = context.new_page()
-            result = run_publication(page, pub, config, ui.review_draft, ui.status)
+            result = run_publication(page, pub, config, ui.status)
             if result:
                 ui.info('Published', 'The post was verified after reload. classroom-published.txt is saved.')
             else:
