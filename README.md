@@ -187,6 +187,8 @@ Do not delete the marker or pending file as a shortcut. A local OS lock prevents
 
 The browser adapter is implemented and tested against a simulated UI, **not against a signed-in Google Classroom account**. Real Google markup is not a stable public interface. In particular, composer containers, picker breadcrumbs/rows/file-ID attributes, and Stream item IDs need live inspection. The application stops on missing/ambiguous elements rather than guessing or treating a disappeared dialog as success.
 
+Actual publishing and sign-in use a visible Chrome window, not headless mode. The final confirmation asks you to inspect that browser draft. Only the simulated browser tests run headless.
+
 Start with exactly two already-synced images in a new folder. First use **Validate a folder**, then run publication while watching the browser. Record the result in `LIVE-TEST.md`.
 
 Page settings are listed in `ui.reference.json` and implemented in `browser.py`'s `DEFAULT_UI`. Override only necessary entries under `ui` in `config.json`. A locator can be a CSS selector string, `{"role": "button", "name": "Exact visible label"}`, or `{"text": "Exact visible text"}`. English button/tab names may need translation. The `picker_my_drive` entry must retain a `name` field because it also identifies the first breadcrumb.
@@ -201,6 +203,8 @@ An example label override is:
 ```
 
 Do not copy placeholder labels literally. Use observed labels from your account. For developer inspection, run the `inspect` command below; Playwright Inspector pauses the browser so you can inspect the real composer and picker without automating publication. Resume/close it to end inspection. Do not publish from Inspector.
+
+If opening the Stream composer reports zero matches, that alone does not prove student posting is disabled. The default recognizes “Share something with your class”, “Announce something to your class”, “New announcement”, and “Jauns paziņojums”, with optional ellipsis. For another language, set `ui.open_composer` to `{"text": "the exact prompt shown on your Stream"}`. Remove an outdated `ui.open_composer` override to use the updated default. Locators also support `{"text_regex": "^an anchored expression$"}`; ambiguous visible matches still stop publication. After a failed attempt, use the recovery steps above before retrying.
 
 Required observations before calling this ready for everyday use:
 

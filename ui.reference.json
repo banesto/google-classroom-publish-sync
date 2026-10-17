@@ -2,7 +2,7 @@
   "ui": {
     "account": "a[href^=\"https://accounts.google.com/SignOutOptions\"], [aria-label*=\"Google Account\"], [data-tooltip*=\"Google Account\"]",
     "open_composer": {
-      "text": "Announce something to your class"
+      "text_regex": "^(?:Share something with your class|Announce something to your class|New announcement|Jauns paziņojums)(?:…|\\.{3})?$"
     },
     "composer": "[role=\"dialog\"]:has([contenteditable=\"true\"]), form:has([contenteditable=\"true\"])",
     "editor": "[contenteditable=\"true\"][role=\"textbox\"]",

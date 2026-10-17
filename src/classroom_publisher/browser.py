@@ -12,7 +12,7 @@ from .core import begin, confirm, recheck, update_pending
 DEFAULT_UI = {
     'account': ('a[href^="https://accounts.google.com/SignOutOptions"], '
                 '[aria-label*="Google Account"], [data-tooltip*="Google Account"]'),
-    'open_composer': {'text': 'Announce something to your class'},
+    'open_composer': {'text_regex': r'^(?:Share something with your class|Announce something to your class|New announcement|Jauns paziņojums)(?:…|\.{3})?$'},
     'composer': '[role="dialog"]:has([contenteditable="true"]), form:has([contenteditable="true"])',
     'editor': '[contenteditable="true"][role="textbox"]',
     'add': {'role': 'button', 'name': 'Add'},
@@ -41,6 +41,8 @@ def locate(scope, spec):
         return scope.locator(spec)
     if 'role' in spec:
         return scope.get_by_role(spec['role'], name=spec['name'], exact=True)
+    if 'text_regex' in spec:
+        return scope.get_by_text(re.compile(spec['text_regex']))
     return scope.get_by_text(spec['text'], exact=True)
 
 
@@ -112,6 +114,16 @@ class ClassroomPage:
     def composer(self):
         return unique(locate(self.page, self.ui['composer']), 'Post composer')
 
+    def composer_opener(self):
+        spec = self.ui['open_composer']
+        # Classroom can expose the prompt as an accessible button name while
+        # rendering different text inside it. Prefer that control when present.
+        if isinstance(spec, dict) and 'text_regex' in spec:
+            buttons = self.page.get_by_role('button', name=re.compile(spec['text_regex'])).filter(visible=True)
+            if buttons.count():
+                return unique(buttons, 'Open Stream composer')
+        return unique(locate(self.page, spec).filter(visible=True), 'Open Stream composer')
+
     def post_ids(self):
         ids = []
         for item in locate(self.page, self.ui['posts']).all():
@@ -149,8 +161,10 @@ class ClassroomPage:
         for post in locate(self.page, self.ui['posts']).all():
             if self.text_matches(post, pub.text):
                 raise ValueError('A loaded Stream post already has this text. Inspect it before publishing.')
-        self.wait(lambda: unique(locate(self.page, self.ui['open_composer']), 'Open Stream composer'),
-                  'Stream composer is unavailable; check student posting permissions').click()
+        self.wait(self.composer_opener,
+                  'Cannot locate the Stream post box. This does not establish a permissions problem. '
+                  'Open the class Stream and check its exact prompt/language against ui.open_composer; '
+                  'if no post box is visible, check student posting permissions. Post was not clicked').click()
         composer = self.wait(lambda: self.composer(), 'Composer did not open')
         editor = unique(locate(composer, self.ui['editor']), 'Post editor')
         editor.fill(pub.text)

@@ -157,6 +157,43 @@ class BrowserTests(unittest.TestCase):
         self.page.goto(self.pub.url)
         return self.page.locator('a[aria-label]')
 
+    def test_student_composer_prompt_variants(self):
+        for prompt in ('Share something with your class', 'Share something with your class...',
+                       'Share something with your class…', 'Announce something to your class',
+                       'New announcement', 'Jauns paziņojums'):
+            with self.subTest(prompt=prompt):
+                self.page.goto(self.pub.url)
+                self.page.locator('#open').evaluate('(el, text) => el.textContent = text', prompt)
+                ClassroomPage(self.page, self.config).open_draft(self.pub)
+                self.assertEqual(self.page.locator('[contenteditable]').inner_text().split(), self.pub.text.split())
+                self.assertEqual(self.post_calls, 0)
+
+    def test_ambiguous_composer_stops_before_post(self):
+        self.page.goto(self.pub.url)
+        self.page.locator('#open').evaluate('el => el.after(el.cloneNode(true))')
+        with self.assertRaisesRegex(ValueError, 'expected one match, found 2'):
+            ClassroomPage(self.page, self.config).open_draft(self.pub)
+        self.assert_blocked(0)
+
+    def test_composer_accessible_button_label(self):
+        for label in ('New announcement', 'Jauns paziņojums'):
+            with self.subTest(label=label):
+                self.page.goto(self.pub.url)
+                self.page.locator('#open').evaluate('''(el, label) => {
+                    el.textContent = 'A different visible prompt';
+                    el.setAttribute('aria-label', label);
+                }''', label)
+                ClassroomPage(self.page, self.config).open_draft(self.pub)
+                self.assertTrue(self.page.locator('#composer').is_visible())
+                self.assertEqual(self.post_calls, 0)
+
+    def test_localized_composer_override(self):
+        self.page.goto(self.pub.url)
+        self.page.locator('#open').evaluate('(el) => el.textContent = "Class post prompt in another language"')
+        config = dict(self.config, ui={'open_composer': {'text': 'Class post prompt in another language'}})
+        ClassroomPage(self.page, config).open_draft(self.pub)
+        self.assertEqual(self.post_calls, 0)
+
     def test_localized_account_label_with_menu_link(self):
         account = self.account_page()
         account.evaluate('''el => {
