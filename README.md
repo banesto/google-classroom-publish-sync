@@ -193,7 +193,7 @@ Actual publishing and sign-in use a visible Chrome window, not headless mode. Th
 
 Start with exactly two already-synced images in a new folder. First use **Validate a folder**, then run publication while watching the browser. Record the result in `LIVE-TEST.md`.
 
-Page settings are listed in `ui.reference.json` and implemented in `browser.py`'s `DEFAULT_UI`. Override only necessary entries under `ui` in `config.json`. A locator can be a CSS selector string, `{"role": "button", "name": "Exact visible label"}`, or `{"text": "Exact visible text"}`. English button/tab names may need translation. The `picker_my_drive` entry must retain a `name` field because it also identifies the first breadcrumb.
+Page settings are listed in `ui.reference.json` and implemented in `browser.py`'s `DEFAULT_UI`. Override only necessary entries under `ui` in `config.json`. A locator can be a CSS selector string, `{"role": "button", "name": "Exact visible label"}`, or `{"text": "Exact visible text"}`. English button/tab names may need translation. Role locators can use `names` for an explicit list of exact accessible names. The `picker_my_drive` entry must retain a `role` and either `name` or `names`; the matched name identifies the first breadcrumb.
 
 An example label override is:
 
@@ -298,3 +298,14 @@ CLASSROOM_BROWSER_TESTS=1 python -m unittest discover -s tests -v
 All fixture browser requests are intercepted. These tests exercise the full two-file selection → one Post click → reload → success marker flow, plus wrong account, missing/duplicate files, order mismatch, changed local files, existing post, cancellation, missing persisted post, wrong persisted Drive ID, and a network failure after acceptance. They do not access Google or publish real content. Windows installer/Explorer behavior and the Tk dialogs still require a Windows 11 smoke test.
 
 References: [Google's student Stream workflow](https://support.google.com/edu/classroom/answer/6020274?co=GENIE.Platform%3DDesktop&hl=en), [Playwright persistent browser contexts](https://playwright.dev/python/docs/api/class-browsertype#browser-type-launch-persistent-context).
+
+
+### Observed Latvian controls and HTML inspection
+
+The user observed a direct Drive attachment button with accessible name `Pievienot Google diska failu`, the publish label `Izlikt`, and the Drive tab `Mans disks`. These labels are supported. A unique visible direct Drive button opens the picker without the older Add → Google Drive menu sequence. The older flow remains supported when the direct button is absent. Existing `ui.post` or `ui.picker_my_drive` overrides take precedence; remove outdated overrides to use the defaults.
+
+The picker path is the configured `drive_path` plus the publication folder's path relative to the configured local class root. For example, a Drive root of `["5.klase"]` and a local publication folder `L_Lat.v/Finished work` select `Mans disks → 5.klase → L_Lat.v → Finished work`. Folder names are not hardcoded. Only the validated files directly inside that publication folder are selected, in natural filename order.
+
+The supplied View Source exports did not contain the runtime composer or picker. Their rows, breadcrumbs, file-ID attributes, and selection button therefore remain unverified against live Classroom. The Latvian flow is tested against a simulated picker, not those exports.
+
+To capture usable markup, open the popup, press F12, and use the **Elements** tab (not View Source). Use the element selector to select a control, move up to the enclosing dialog, then right-click → Copy → Copy outerHTML. For the Drive picker, select an element inside the picker iframe and copy its enclosing dialog or document element from inside that frame. Copying only the outer iframe does not capture its contents. Preserve role, aria-label, and structural attributes; redact personal text and identifiers. Keep these captures outside the repository.

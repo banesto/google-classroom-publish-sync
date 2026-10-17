@@ -123,6 +123,7 @@ class BrowserTests(unittest.TestCase):
         self.persist = True
         self.fail_click_response = False
         self.reload_mutation = False
+        self.latvian_direct = False
         self.page = self.browser.new_page()
         self.addCleanup(self.page.close)
         self.page.route('**/*', self.route)
@@ -130,7 +131,8 @@ class BrowserTests(unittest.TestCase):
     def route(self, route):
         url = route.request.url
         if url == 'https://docs.google.com/picker':
-            route.fulfill(content_type='text/html', body=PICKER.replace('FILES', json.dumps(self.files))
+            picker_html = PICKER.replace('My Drive', 'Mans disks') if self.latvian_direct else PICKER
+            route.fulfill(content_type='text/html', body=picker_html.replace('FILES', json.dumps(self.files))
                           .replace('FOLDERPATH', json.dumps(self.pub.drive_path)))
         elif url.endswith('/fixture/publish'):
             self.post_calls += 1
@@ -146,6 +148,13 @@ class BrowserTests(unittest.TestCase):
             if self.reload_mutation and posts:
                 posts[-1]['files'][-1]['id'] = 'wrong-drive-id'
             html = CLASSROOM.replace('ACCOUNT', self.account).replace('SAVED', json.dumps(posts))
+            if self.latvian_direct:
+                html = html.replace('<button id="add">Add</button>',
+                                    '<button id="add" hidden>Add</button>')
+                html = html.replace('<button role="menuitem" id="drive" hidden>Google Drive</button>',
+                                    '<button id="drive" aria-label="Pievienot Google diska failu"><svg></svg></button>')
+                html = html.replace('id="post">Post', 'id="post">Izlikt')
+                html = html.replace("document.querySelector('#drive').hidden=true;", '')
             route.fulfill(content_type='text/html', body=html.replace('REORDER', str(self.reorder).lower()))
         else:
             route.abort()  # Fixture cannot reach real Google or download anything.
@@ -264,6 +273,24 @@ class BrowserTests(unittest.TestCase):
         self.assertIn(self.pub.text, marker)
         self.assertIn('https://classroom.google.com/c/test/p/new-post', marker)
         self.assertFalse((self.folder / PENDING).exists())
+
+    def test_latvian_direct_drive_folder_flow(self):
+        self.latvian_direct = True
+        self.pub.drive_path = ['5.klase', 'L_Lat.v', self.folder.name]
+        self.assertTrue(self.run_flow())
+        self.assertEqual(self.post_calls, 1)
+        self.assertEqual([a['id'] for a in self.posts[0]['files']], ['drive2', 'drive10'])
+        self.assertTrue((self.folder / MARKER).exists())
+
+    def test_duplicate_direct_drive_controls_rejected(self):
+        self.latvian_direct = True
+        self.page.goto(self.pub.url)
+        adapter = ClassroomPage(self.page, self.config)
+        adapter.open_draft(self.pub)
+        self.page.locator('#drive').evaluate('el => el.after(el.cloneNode(true))')
+        with self.assertRaisesRegex(ValueError, 'Direct Google Drive button: expected one match, found 2'):
+            adapter.attach(self.pub, self.pub.names[0], [])
+        self.assert_blocked(0)
 
     def test_nested_non_date_folder_end_to_end(self):
         (self.folder / PENDING).unlink()  # No browser work has started in this fixture.

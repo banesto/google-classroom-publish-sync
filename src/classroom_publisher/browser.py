@@ -16,10 +16,11 @@ DEFAULT_UI = {
     'composer': '[role="dialog"]:has([contenteditable="true"]), form:has([contenteditable="true"])',
     'editor': '[contenteditable="true"][role="textbox"]',
     'add': {'role': 'button', 'name': 'Add'},
+    'drive_direct': {'role': 'button', 'name': 'Pievienot Google diska failu'},
     'drive': {'role': 'menuitem', 'name': 'Google Drive'},
-    'post': {'role': 'button', 'name': 'Post'},
+    'post': {'role': 'button', 'names': ['Post', 'Izlikt']},
     'picker_frame': 'iframe[src*="docs.google.com/picker"], iframe[src*="drive.google.com/picker"]',
-    'picker_my_drive': {'role': 'tab', 'name': 'My Drive'},
+    'picker_my_drive': {'role': 'tab', 'names': ['My Drive', 'Mans disks']},
     'picker_rows': '[role="row"]',
     'picker_breadcrumbs': '[aria-label="Breadcrumb"] button, [aria-label="Breadcrumb"] [role="button"]',
     'picker_file_id_attribute': 'data-id',
@@ -40,6 +41,9 @@ def locate(scope, spec):
     if isinstance(spec, str):
         return scope.locator(spec)
     if 'role' in spec:
+        if 'names' in spec:
+            pattern = re.compile('^(?:' + '|'.join(re.escape(name) for name in spec['names']) + ')$')
+            return scope.get_by_role(spec['role'], name=pattern)
         return scope.get_by_role(spec['role'], name=spec['name'], exact=True)
     if 'text_regex' in spec:
         return scope.get_by_text(re.compile(spec['text_regex']))
@@ -186,13 +190,31 @@ class ClassroomPage:
 
     def attach(self, pub, name, expected):
         self.status('Selecting existing Drive file: ' + name)
-        unique(locate(self.composer(), self.ui['add']), 'Add attachment').click()
-        self.wait(lambda: unique(locate(self.page, self.ui['drive']), 'Google Drive menu option'),
-                  'Google Drive menu did not appear').click()
+        def attachment_control():
+            composer = self.composer()
+            direct_spec = self.ui.get('drive_direct')
+            if direct_spec:
+                direct = locate(composer, direct_spec).filter(visible=True)
+                if direct.count():
+                    return unique(direct, 'Direct Google Drive button'), True
+            return unique(locate(composer, self.ui['add']).filter(visible=True), 'Add attachment'), False
+        control, direct = self.wait(attachment_control, 'Cannot locate the Drive attachment control')
+        control.click()
+        if not direct:
+            self.wait(lambda: unique(locate(self.page, self.ui['drive']), 'Google Drive menu option'),
+                      'Google Drive menu did not appear').click()
         picker = self.wait(self.picker, 'Drive picker did not open')
-        self.wait(lambda: unique(locate(picker, self.ui['picker_my_drive']), 'My Drive tab'),
-                  'Drive picker contents did not load').click()
-        path = [self.ui['picker_my_drive']['name']]
+        tab_spec = self.ui['picker_my_drive']
+        tab = self.wait(lambda: unique(locate(picker, tab_spec).filter(visible=True), 'My Drive tab'),
+                        'Drive picker contents did not load')
+        # Use the matched localized name when checking the root breadcrumb.
+        names = tab_spec.get('names', [tab_spec.get('name')])
+        matched = [label for label in names if picker.get_by_role(
+            tab_spec['role'], name=label, exact=True).filter(visible=True).count() == 1]
+        if len(matched) != 1:
+            raise ValueError('Cannot identify the My Drive breadcrumb name.')
+        tab.click()
+        path = matched
         self.wait(lambda: self.breadcrumbs(picker, path), 'Could not reset picker to My Drive')
         for folder in pub.drive_path:
             row = self.wait(lambda: self.exact_row(picker, folder), 'Missing or ambiguous Drive folder ' + folder)
