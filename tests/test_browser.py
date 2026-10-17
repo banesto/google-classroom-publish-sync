@@ -376,7 +376,20 @@ class BrowserTests(unittest.TestCase):
 
     def test_reordered_attachments_stop(self):
         self.reorder = True
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, 'All intended files were recognized'):
+            self.run_flow()
+        self.assert_blocked(0)
+
+    def test_metadata_in_picker_is_not_selected(self):
+        self.files.extend([{'name': '.classroom-pending.json', 'id': 'pendingmetadata'},
+                           {'name': '.classroom-draft.json', 'id': 'draftmetadata'}])
+        self.assertTrue(self.run_flow())
+        self.assertEqual([item['id'] for item in self.posts[0]['files']], ['drive2', 'drive10'])
+        self.assertEqual(self.picker_visits, 1)
+
+    def test_unrecognized_attachment_markup_reports_missing_links(self):
+        self.config['ui'] = {'attachments': 'a.unrecognized-attachment'}
+        with self.assertRaisesRegex(ValueError, 'No Drive attachment links were recognized'):
             self.run_flow()
         self.assert_blocked(0)
 

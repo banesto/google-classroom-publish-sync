@@ -160,8 +160,16 @@ class ClassroomPage:
             if len(names) != 1:
                 raise ValueError('Cannot uniquely identify an attachment filename; inspect UI settings.')
             results.append({'name': names.pop(), 'id': drive_id(link.get_attribute('href') or '')})
-        if [a['name'] for a in results] != expected_names:
-            raise ValueError('Attachment count or displayed order differs from the natural filename order.')
+        observed_names = [a['name'] for a in results]
+        if observed_names != expected_names:
+            if not results:
+                reason = 'No Drive attachment links were recognized. The composer markup may differ from the configured selector.'
+            elif sorted(observed_names) == sorted(expected_names):
+                reason = 'All intended files were recognized, but their displayed order differs from natural filename order.'
+            else:
+                reason = 'The recognized attachment count or filenames differ from the intended files.'
+            raise ValueError(reason + f'\nExpected ({len(expected_names)}): {expected_names!r}'
+                             + f'\nRecognized ({len(observed_names)}): {observed_names!r}')
         if len({a['id'] for a in results}) != len(results):
             raise ValueError('The same Drive file is attached more than once.')
         return results
@@ -204,7 +212,6 @@ class ClassroomPage:
         return unique(rows, 'Drive item ' + name)
 
     def attach(self, pub):
-        self.status('Selecting existing Drive files in one picker visit')
         def attachment_control():
             composer = self.composer()
             direct_spec = self.ui.get('drive_direct')
