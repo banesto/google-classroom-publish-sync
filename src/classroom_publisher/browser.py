@@ -21,8 +21,8 @@ DEFAULT_UI = {
     'post': {'role': 'button', 'names': ['Post', 'Izlikt']},
     'picker_frame': 'iframe[src*="docs.google.com/picker"], iframe[src*="drive.google.com/picker"]',
     'picker_my_drive': {'role': 'tab', 'names': ['My Drive', 'Mans disks']},
-    'picker_rows': '[role="row"]',
-    'picker_breadcrumbs': '[aria-label="Breadcrumb"] button, [aria-label="Breadcrumb"] [role="button"]',
+    'picker_rows': '[role="row"], [role="option"][data-target="doc"]',
+    'picker_breadcrumbs': '[aria-label="Breadcrumb"] button, [aria-label="Breadcrumb"] [role="button"], [role="button"][data-id][data-tooltiptext]',
     'picker_file_id_attribute': 'data-id',
     'picker_select': {'role': 'button', 'name': 'Insert'},
     'attachments': 'a[href*="drive.google.com/file/d/"], a[href*="drive.google.com/open?"]',
@@ -179,8 +179,17 @@ class ClassroomPage:
         return frame.content_frame
 
     def breadcrumbs(self, picker, expected):
-        names = [x.strip() for x in locate(picker, self.ui['picker_breadcrumbs']).all_inner_texts()]
-        if names != expected:
+        controls = locate(picker, self.ui['picker_breadcrumbs']).filter(visible=True)
+        names = [x.strip() for x in controls.all_inner_texts()]
+        # Observed picker: root has no breadcrumbs; nested paths use English
+        # "My Drive" even when the selected tab is Latvian "Mans disks".
+        if not names and len(expected) == 1:
+            tab = locate(picker, self.ui['picker_my_drive']).filter(visible=True)
+            grid = picker.locator('[role="listbox"]:has([role="option"][data-target="doc"])').filter(visible=True)
+            if tab.count() == 1 and tab.get_attribute('aria-selected') == 'true' and grid.count() == 1:
+                return True
+        roots = {'My Drive', expected[0]}
+        if not names or names[0] not in roots or names[1:] != expected[1:]:
             raise ValueError('Drive folder breadcrumb differs from configured path: ' + ' / '.join(names))
         return True
 
@@ -215,12 +224,27 @@ class ClassroomPage:
             raise ValueError('Cannot identify the My Drive breadcrumb name.')
         tab.click()
         path = matched
+        # Reopening a picker may retain a nested folder. Explicitly return via
+        # the observed root breadcrumb before accepting the root view.
+        crumbs = locate(picker, self.ui['picker_breadcrumbs']).filter(visible=True)
+        if crumbs.count() > 1:
+            if crumbs.first.inner_text().strip() not in {'My Drive', matched[0]}:
+                raise ValueError('Cannot identify the Drive root breadcrumb.')
+            crumbs.first.click()
         self.wait(lambda: self.breadcrumbs(picker, path), 'Could not reset picker to My Drive')
         for folder in pub.drive_path:
             row = self.wait(lambda: self.exact_row(picker, folder), 'Missing or ambiguous Drive folder ' + folder)
+            folder_id = row.get_attribute(self.ui['picker_file_id_attribute'])
             row.dblclick()
             path.append(folder)
-            self.wait(lambda: self.breadcrumbs(picker, path), 'Could not verify Drive folder ' + folder)
+            def verified_folder():
+                self.breadcrumbs(picker, path)
+                crumbs = locate(picker, self.ui['picker_breadcrumbs']).filter(visible=True)
+                current_id = crumbs.last.get_attribute('data-id')
+                if current_id is not None and (not folder_id or current_id != folder_id):
+                    raise ValueError('Opened Drive folder ID differs from the selected folder.')
+                return True
+            self.wait(verified_folder, 'Could not verify Drive folder ' + folder)
         row = self.wait(lambda: self.exact_row(picker, name), 'Missing or ambiguous Drive file ' + name)
         file_id = row.get_attribute(self.ui['picker_file_id_attribute'])
         if not file_id or not re.fullmatch(r'[A-Za-z0-9_-]+', file_id):

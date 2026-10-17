@@ -29,8 +29,8 @@
         "Mans disks"
       ]
     },
-    "picker_rows": "[role=\"row\"]",
-    "picker_breadcrumbs": "[aria-label=\"Breadcrumb\"] button, [aria-label=\"Breadcrumb\"] [role=\"button\"]",
+    "picker_rows": "[role=\"row\"], [role=\"option\"][data-target=\"doc\"]",
+    "picker_breadcrumbs": "[aria-label=\"Breadcrumb\"] button, [aria-label=\"Breadcrumb\"] [role=\"button\"], [role=\"button\"][data-id][data-tooltiptext]",
     "picker_file_id_attribute": "data-id",
     "picker_select": {
       "role": "button",

@@ -124,6 +124,7 @@ class BrowserTests(unittest.TestCase):
         self.fail_click_response = False
         self.reload_mutation = False
         self.latvian_direct = False
+        self.grid_picker = False
         self.page = self.browser.new_page()
         self.addCleanup(self.page.close)
         self.page.route('**/*', self.route)
@@ -132,6 +133,16 @@ class BrowserTests(unittest.TestCase):
         url = route.request.url
         if url == 'https://docs.google.com/picker':
             picker_html = PICKER.replace('My Drive', 'Mans disks') if self.latvian_direct else PICKER
+            if self.grid_picker:
+                picker_html = picker_html.replace('id="mydrive"', 'id="mydrive" aria-selected="true"')
+                picker_html = picker_html.replace('<nav aria-label="Breadcrumb">', '<nav>')
+                picker_html = picker_html.replace('<div id="rows">', '<div id="rows" role="listbox">')
+                picker_html = picker_html.replace("['Mans disks',...path.slice(0,depth)]", "(depth ? ['My Drive',...path.slice(0,depth)] : [])")
+                picker_html = picker_html.replace("b.textContent=name; nav.append(b);", """b.textContent=name;
+                    b.setAttribute('role', 'button'); b.dataset.tooltiptext=name;
+                    b.dataset.id=nav.children.length ? 'folder'+(nav.children.length-1) : 'root';
+                    nav.append(b);""")
+                picker_html = picker_html.replace("row.setAttribute('role','row');", "row.setAttribute('role','option'); row.dataset.target='doc';")
             route.fulfill(content_type='text/html', body=picker_html.replace('FILES', json.dumps(self.files))
                           .replace('FOLDERPATH', json.dumps(self.pub.drive_path)))
         elif url.endswith('/fixture/publish'):
@@ -281,6 +292,23 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(self.post_calls, 1)
         self.assertEqual([a['id'] for a in self.posts[0]['files']], ['drive2', 'drive10'])
         self.assertTrue((self.folder / MARKER).exists())
+
+    def test_observed_grid_and_mixed_language_breadcrumbs(self):
+        self.latvian_direct = True
+        self.grid_picker = True
+        self.pub.drive_path = ['5.klase', 'L_Lat.v', self.folder.name]
+        self.assertTrue(self.run_flow())
+        self.assertEqual(self.post_calls, 1)
+
+    def test_grid_root_does_not_accept_missing_nested_breadcrumbs(self):
+        self.page.goto(self.pub.url)
+        self.page.locator('body').evaluate('''el => el.innerHTML =
+            '<button role="tab" aria-selected="true">Mans disks</button>' +
+            '<div role="listbox"><div role="option" data-target="doc">Folder</div></div>' ''')
+        adapter = ClassroomPage(self.page, self.config)
+        self.assertTrue(adapter.breadcrumbs(self.page, ['Mans disks']))
+        with self.assertRaisesRegex(ValueError, 'breadcrumb differs'):
+            adapter.breadcrumbs(self.page, ['Mans disks', '5.klase'])
 
     def test_duplicate_direct_drive_controls_rejected(self):
         self.latvian_direct = True
