@@ -8,7 +8,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from classroom_publisher.browser import ClassroomPage, run_publication, verify_existing_page
+from classroom_publisher.browser import ClassroomPage, run_publication, verify_existing_page, launch
 from classroom_publisher.core import MARKER, PENDING, begin, prepare, update_pending
 
 CLASSROOM = r'''<!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -99,7 +99,7 @@ class BrowserTests(unittest.TestCase):
         from playwright.sync_api import sync_playwright
         cls.playwright = sync_playwright().start()
         cls.tmp_profile = tempfile.TemporaryDirectory()
-        cls.browser = cls.playwright.chromium.launch_persistent_context(cls.tmp_profile.name, channel='chrome', headless=True)
+        cls.browser = launch(cls.playwright, Path(cls.tmp_profile.name), {})
 
     @classmethod
     def tearDownClass(cls):

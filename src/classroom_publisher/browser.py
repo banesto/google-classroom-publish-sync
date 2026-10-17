@@ -382,7 +382,7 @@ def run_publication(page, pub, config, status=lambda _: None):
     """Shared by the real browser and isolated browser-fixture integration tests."""
     adapter = ClassroomPage(page, config, status)
     page.goto(pub.url, wait_until='domcontentloaded')
-    adapter.wait(lambda: adapter.identity(pub), 'Check the child login and account selector')
+    adapter.wait(lambda: adapter.identity(pub), 'Check the child login and account selector. If the session expired, use Sign in / inspect class')
     baseline = adapter.post_ids()
     adapter.open_draft(pub)
     expected = adapter.attach(pub)
@@ -392,10 +392,10 @@ def run_publication(page, pub, config, status=lambda _: None):
     return True
 
 
-def launch(p, profile, config):
+def launch(p, profile, config, *, headless=True):
     profile.mkdir(parents=True, exist_ok=True)
     return p.chromium.launch_persistent_context(str(profile), channel=config.get('browser_channel', 'chrome'),
-                                               headless=False, accept_downloads=False)
+                                               headless=headless, accept_downloads=False, viewport={'width': 1440, 'height': 1000})
 
 
 def verify_existing_page(page, folder, config, record):
@@ -429,7 +429,8 @@ def verify_existing(folder, config, base, ui):
         context = launch(p, profile_path(record['child'], config, base), config)
         try:
             verify_existing_page(context.new_page(), folder, config, record)
-            ui.info('Publication verified', 'The existing post was verified. No new post was created.')
+            ui.notify('Publication verified', record['child'] + ' — ' + ' / '.join(record['drive_path'])
+                      + f"\n{len(record['names'])} attachments verified")
         finally:
             context.close()
 
@@ -448,7 +449,8 @@ def publish(pub, config, config_dir, ui):
             page = context.new_page()
             result = run_publication(page, pub, config, ui.status)
             if result:
-                ui.info('Published', 'The post was verified after reload. classroom-published.txt is saved.')
+                ui.notify('Published to Classroom', pub.child + ' — ' + ' / '.join(pub.drive_path)
+                          + f'\n{len(pub.names)} attachments published')
             else:
                 ui.info('Stopped', 'No automated Post click was made. Use Recover to inspect and clear this attempt.')
             return result
@@ -460,7 +462,7 @@ def sign_in(child, config, base, ui, inspect=False):
     from playwright.sync_api import sync_playwright
     target = next(c['url'] for c in config['classes'] if c['child'] == child)
     with sync_playwright() as p:
-        context = launch(p, profile_path(child, config, base), config)
+        context = launch(p, profile_path(child, config, base), config, headless=False)
         try:
             page = context.new_page()
             page.goto(target, wait_until='domcontentloaded')

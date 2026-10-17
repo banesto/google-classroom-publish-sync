@@ -128,7 +128,7 @@ Filenames use case-insensitive natural order: `2.jpg` before `10.jpg`. A determi
 3. Review/edit the text and click **Prepare in Classroom**.
 4. Let the automation select the files. Do not operate the automated Chrome window while it is preparing the draft.
 5. Review the completed draft and approve the final dialog. Do not click Post manually in Chrome.
-6. A success dialog appears only after the persisted post has been verified and the marker saved.
+6. A non-blocking success notification is requested only after the persisted post has been verified and the marker saved.
 
 The menu also works on empty background space inside the publication folder. The current installer adds the action to the classic **Show more options** menu. Moving it into Windows 11’s main menu requires a native `IExplorerCommand` COM extension registered with app identity (MSIX or a sparse package). A plain registry verb cannot be promoted there by changing its position or icon. This release does not build/register that native extension or change Explorer’s global menu behavior. See [Microsoft’s extension requirements](https://learn.microsoft.com/windows/apps/desktop/modernize/integrate-packaged-app-with-file-explorer).
 
@@ -189,7 +189,7 @@ Do not delete the marker or pending file as a shortcut. A local OS lock prevents
 
 The browser adapter is implemented and tested against a simulated UI, **not against a signed-in Google Classroom account**. Real Google markup is not a stable public interface. In particular, composer containers, picker breadcrumbs/rows/file-ID attributes, and Stream item IDs need live inspection. The application stops on missing/ambiguous elements rather than guessing or treating a disappeared dialog as success.
 
-Actual publishing and sign-in use a visible Chrome window, not headless mode. The editable publication dialog authorizes posting after the automated checks. Only the simulated browser tests run headless.
+Publishing and existing-post verification run headlessly with the saved child-specific profile and a fixed 1440×1000 viewport. Sign-in and inspection still open visible Chrome. The editable publication dialog authorizes posting after automated checks. If the login expires, use Sign in / inspect class; the app never automatically retries Post.
 
 Start with exactly two already-synced images in a new folder. First use **Validate a folder**, then run publication while watching the browser. Record the result in `LIVE-TEST.md`.
 
@@ -326,3 +326,8 @@ After the operator checks that no post exists, closes old composers, and clicks 
 Publication now proceeds automatically after the editable dialog and successful draft checks, without an extra approval popup. The Post click is still attempted only once. Published-page verification recognizes outermost Stream items, split title/description spans, cover-image accessibility labels, and duplicate thumbnail/title links within one attachment card. It still checks complete text and exact Drive identities after a reload.
 
 For an existing successful post with an uncertain saved outcome, choose **Verify existing post** in recovery. This uses the saved text, selected Drive IDs, and pre-post baseline to find the same new post across two page loads. It never clicks Post or adds attachments. If verification succeeds it writes the success marker; otherwise the attempt remains unresolved. Edits in the recovery text box do not change the evidence used for verifying the original post.
+
+
+### Background publishing notifications
+
+After the initial text review or recovery choice, publishing runs in hidden Chrome. Errors open a focused alert. Success requests a non-blocking OS notification identifying the child, Drive folder path, and attachment count. Windows uses a short-lived notification-area helper with no console window; macOS uses the system notification command; Linux uses `notify-send` when available. OS notification settings, Do Not Disturb, or missing notification support can suppress a notification. Notification delivery never controls success or triggers a retry: `classroom-published.txt` remains authoritative. Native notification rendering and headless publishing against the school's live account still need an on-device check.

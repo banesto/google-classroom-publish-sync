@@ -25,9 +25,13 @@ class UI:
         messagebox.showinfo(title, text, parent=self.root)
 
     def error(self, text):
-        self.document('Stopped — nothing further will be posted', text)
+        self.document('Stopped — nothing further will be posted', text, focus=True)
 
-    def document(self, title, text):
+    def notify(self, title, text):
+        from .notifications import notify
+        notify(title, text)
+
+    def document(self, title, text, focus=False):
         win = tk.Toplevel(self.root)
         win.title(title)
         win.geometry('760x540')
@@ -42,6 +46,11 @@ class UI:
         box.configure(state='disabled')
         ttk.Button(win, text='Close', command=win.destroy).pack(pady=8)
         win.grab_set()
+        if focus:
+            win.lift()
+            win.attributes('-topmost', True)
+            win.focus_force()
+            win.after(500, lambda: win.attributes('-topmost', False) if win.winfo_exists() else None)
         self.root.wait_window(win)
 
     def ask(self, title, text):
