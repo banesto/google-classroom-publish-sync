@@ -9,6 +9,7 @@ from .config import class_id, profile_path, resolve_path, validate_config
 
 MARKER = 'classroom-published.txt'
 PENDING = '.classroom-pending.json'
+DRAFT = '.classroom-draft.json'
 SUPPORTED = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf'}
 
 
@@ -84,6 +85,13 @@ def prepare(folder, config, config_dir):
         extra = description.read_text(encoding='utf-8-sig').strip()
         if extra:
             text += '\n\n' + extra
+    draft = folder / DRAFT
+    if draft.exists():
+        record = json.loads(draft.read_text(encoding='utf-8'))
+        if (record['child'] != c['child'] or record['email'] != child['email'].strip()
+                or class_id(record['class_url']) != class_id(c['url'])):
+            raise ValueError('Recovered draft belongs to a different child or class.')
+        text = record['text']
     return Publication(folder, c['child'], child['email'].strip(),
                        profile_path(c['child'], config, config_dir), c['url'], text,
                        list(snapshot), c['drive_path'] + relative_parts, snapshot)
@@ -94,6 +102,16 @@ def exclusive_write(path, text):
         f.write(text)
         f.flush()
         os.fsync(f.fileno())
+
+
+def allow_retry(folder):
+    """Called only after the operator confirms ABSENT and closes old composers."""
+    folder = Path(folder)
+    if (folder / MARKER).exists():
+        raise ValueError('Already published; cannot allow a retry.')
+    # Preserve the complete reviewed text and old metadata atomically. This is
+    # a reusable draft, not a pending attempt or evidence of success.
+    os.replace(folder / PENDING, folder / DRAFT)
 
 
 def begin(pub):

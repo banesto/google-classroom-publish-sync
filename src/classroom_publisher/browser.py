@@ -203,8 +203,8 @@ class ClassroomPage:
         rows = locate(picker, self.ui['picker_rows']).filter(has=picker.get_by_text(name, exact=True))
         return unique(rows, 'Drive item ' + name)
 
-    def attach(self, pub, name, expected):
-        self.status('Selecting existing Drive file: ' + name)
+    def attach(self, pub):
+        self.status('Selecting existing Drive files in one picker visit')
         def attachment_control():
             composer = self.composer()
             direct_spec = self.ui.get('drive_direct')
@@ -251,11 +251,24 @@ class ClassroomPage:
                     raise ValueError('Opened Drive folder ID differs from the selected folder.')
                 return True
             self.wait(verified_folder, 'Could not verify Drive folder ' + folder)
-        row = self.wait(lambda: self.exact_row(picker, name), 'Missing or ambiguous Drive file ' + name)
-        file_id = row.get_attribute(self.ui['picker_file_id_attribute'])
-        if not file_id or not re.fullmatch(r'[A-Za-z0-9_-]+', file_id):
-            raise ValueError('Drive picker did not expose a verifiable file ID. No upload or Copy fallback is allowed.')
-        row.click()
+        expected = []
+        for name in pub.names:
+            row = self.wait(lambda: self.exact_row(picker, name), 'Missing or ambiguous Drive file ' + name)
+            file_id = row.get_attribute(self.ui['picker_file_id_attribute'])
+            if not file_id or not re.fullmatch(r'[A-Za-z0-9_-]+', file_id):
+                raise ValueError('Drive picker did not expose a verifiable file ID.')
+            if file_id in [item['id'] for item in expected]:
+                raise ValueError('The same Drive file is listed more than once.')
+            row.click(modifiers=['ControlOrMeta'] if expected else [])
+            expected.append({'name': name, 'id': file_id})
+        def selection_matches():
+            selected = locate(picker, self.ui['picker_rows']).filter(visible=True)
+            ids = [item.get_attribute(self.ui['picker_file_id_attribute']) for item in selected.all()
+                   if item.get_attribute('aria-selected') == 'true']
+            if len(ids) != len(expected) or set(ids) != {item['id'] for item in expected}:
+                raise ValueError('Picker selection differs from the intended Drive files.')
+            return True
+        self.wait(selection_matches, 'Could not verify the complete picker selection')
         # The observed button displays Pievienot but its accessible name also
         # includes the selected-item count. Match its visible text in the picker.
         try:
@@ -270,7 +283,6 @@ class ClassroomPage:
                              f'\nVisible picker buttons: {observed!r}') from exc
         confirmation.click()
         self.page.locator(self.ui['picker_frame']).filter(visible=True).wait_for(state='hidden', timeout=self.timeout)
-        expected = expected + [{'name': name, 'id': file_id}]
         def verified():
             actual = self.attachments(self.composer(), [a['name'] for a in expected])
             if actual != expected:
@@ -336,9 +348,7 @@ def run_publication(page, pub, config, review_draft, status=lambda _: None):
     adapter.wait(lambda: adapter.identity(pub), 'Check the child login and account selector')
     baseline = adapter.post_ids()
     adapter.open_draft(pub)
-    expected = []
-    for name in pub.names:
-        expected = adapter.attach(pub, name, expected)
+    expected = adapter.attach(pub)
     update_pending(pub.folder, stage='draft_ready', attachments=expected, baseline_post_ids=baseline)
     adapter.draft_matches(pub, expected)
     if not review_draft(pub):

@@ -314,3 +314,10 @@ To capture usable markup, open the popup, press F12, and use the **Elements** ta
 The post review dialog defaults to 680×440 with a short description area and a four-row, scrollable attachment list. Its buttons have a separate layout row. Actual Windows display scaling still needs a visual check.
 
 An exact legacy `ui.picker_select` value of `{"role": "button", "name": "Insert"}` is migrated in memory to the current bilingual confirmation selector. Other custom selectors are preserved. If confirmation cannot be located, the error includes the effective selector and visible picker button text/accessibility labels; share that diagnostic instead of changing labels by trial and error.
+
+
+### Batch attachments and recovered descriptions
+
+Publication opens the Drive picker once, navigates to the publication folder once, and selects the intended filenames in natural order using additive selection. It checks that the selected Drive IDs exactly match the intended set before clicking the picker confirmation once. It never uses Select All, which could include metadata files. The resulting draft must still have the expected file IDs and displayed order before Post is allowed; batch selection does not guarantee that Google preserves order.
+
+After the operator confirms `ABSENT` and closes old composers, recovery atomically renames `.classroom-pending.json` to `.classroom-draft.json` instead of deleting its contents. The next publication dialog reuses the complete reviewed title and description. This recovered text takes precedence over generated text and `description.txt` and remains editable. All attachments are freshly validated. A new attempt creates a new pending record; unresolved attempts continue to block retries. The draft is not a success marker, and `classroom-published.txt` remains the only success marker.

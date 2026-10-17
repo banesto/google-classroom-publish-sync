@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from classroom_publisher.core import MARKER, PENDING, begin, confirm, prepare
+from classroom_publisher.core import MARKER, PENDING, DRAFT, allow_retry, begin, confirm, prepare
 
 
 class PublicationTests(unittest.TestCase):
@@ -26,6 +26,27 @@ class PublicationTests(unittest.TestCase):
         pub = self.prepare()
         self.assertEqual(pub.names, ['2.JPG', '10.jpg'])
         self.assertEqual(pub.text, 'Matemātika — 2026.10.15\n\nUzdevumi 35–40.')
+
+    def test_recovery_preserves_reviewed_text_for_new_attempt(self):
+        pub = self.prepare()
+        pub.text = 'Edited title\n\nMy previously entered description.'
+        begin(pub)
+        allow_retry(self.folder)
+        self.assertFalse((self.folder / PENDING).exists())
+        self.assertTrue((self.folder / DRAFT).exists())
+        retry = self.prepare()
+        self.assertEqual(retry.text, pub.text)
+        begin(retry)
+        with self.assertRaisesRegex(ValueError, 'Unresolved attempt'):
+            self.prepare()
+
+    def test_recovered_draft_does_not_skip_attachment_validation(self):
+        begin(self.prepare())
+        allow_retry(self.folder)
+        for i in range(19):
+            (self.folder / f'extra{i}.jpg').write_bytes(b'test')
+        with self.assertRaisesRegex(ValueError, 'maximum 20'):
+            self.prepare()
 
     def test_limit_blocks_without_markers(self):
         for i in range(19):

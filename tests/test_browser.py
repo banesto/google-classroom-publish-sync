@@ -41,8 +41,8 @@ document.querySelector('#drive').onclick=()=> {
  let frame=document.createElement('iframe'); frame.src='https://docs.google.com/picker'; document.body.append(frame);
 };
 window.addEventListener('message', event=> {
- if (!event.data.file) return;
- selected.push(event.data.file);
+ if (!event.data.files) return;
+ selected.push(...event.data.files);
  document.querySelector('iframe').remove();
  let files=REORDER ? [...selected].reverse() : selected;
  document.querySelector('#attachments').innerHTML='';
@@ -65,7 +65,7 @@ PICKER = r'''<!doctype html><html><head><meta charset="utf-8"></head><body>
 <script>
 const path=FOLDERPATH;
 const files=FILES;
-let depth=0, chosen=null;
+let depth=0, chosen=[];
 function render(){
  let nav=document.querySelector('nav'); nav.innerHTML='';
  for(let name of ['My Drive',...path.slice(0,depth)]) {
@@ -77,11 +77,16 @@ function render(){
   let row=document.createElement('div'); row.setAttribute('role','row'); row.dataset.id=item.id;
   let label=document.createElement('span'); label.textContent=item.name; row.append(label);
   row.ondblclick=()=>{if(depth<path.length){depth++;render();}};
-  row.onclick=()=>{chosen=item;}; container.append(row);
+  row.onclick=(event)=>{
+   if (!event.ctrlKey && !event.metaKey) {
+    chosen=[]; container.querySelectorAll('[aria-selected]').forEach(el=>el.setAttribute('aria-selected','false'));
+   }
+   chosen.push(item); row.setAttribute('aria-selected','true');
+ }; container.append(row);
  }
 }
 document.querySelector('#mydrive').onclick=()=>{depth=0;render();};
-document.querySelector('#insert').onclick=()=>{if(chosen)parent.postMessage({file:chosen},'*');};
+document.querySelector('#insert').onclick=()=>{if(chosen.length)parent.postMessage({files:chosen},'*');};
 render();
 </script></body></html>'''
 
@@ -117,6 +122,7 @@ class BrowserTests(unittest.TestCase):
         begin(self.pub)
         self.posts = []
         self.post_calls = 0
+        self.picker_visits = 0
         self.account = 'child@example.com'
         self.files = [{'name': '2.jpg', 'id': 'drive2'}, {'name': '10.jpg', 'id': 'drive10'}]
         self.reorder = False
@@ -132,6 +138,7 @@ class BrowserTests(unittest.TestCase):
     def route(self, route):
         url = route.request.url
         if url == 'https://docs.google.com/picker':
+            self.picker_visits += 1
             picker_html = PICKER.replace('My Drive', 'Mans disks') if self.latvian_direct else PICKER
             if self.grid_picker:
                 picker_html = picker_html.replace('<button id="insert">Insert</button>',
@@ -280,6 +287,7 @@ class BrowserTests(unittest.TestCase):
 
     def test_two_file_end_to_end_and_marker(self):
         self.assertTrue(self.run_flow())
+        self.assertEqual(self.picker_visits, 1)
         self.assertEqual(self.post_calls, 1)
         self.assertEqual([a['id'] for a in self.posts[0]['files']], ['drive2', 'drive10'])
         marker = (self.folder / MARKER).read_text(encoding='utf-8')
@@ -332,7 +340,7 @@ class BrowserTests(unittest.TestCase):
         adapter.open_draft(self.pub)
         self.page.locator('#drive').evaluate('el => el.after(el.cloneNode(true))')
         with self.assertRaisesRegex(ValueError, 'Direct Google Drive button: expected one match, found 2'):
-            adapter.attach(self.pub, self.pub.names[0], [])
+            adapter.attach(self.pub)
         self.assert_blocked(0)
 
     def test_nested_non_date_folder_end_to_end(self):

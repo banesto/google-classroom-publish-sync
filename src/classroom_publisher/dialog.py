@@ -105,7 +105,7 @@ class UI:
 
     def recover(self, folder):
         import json
-        from .core import MARKER, PENDING, confirm
+        from .core import MARKER, PENDING, confirm, allow_retry
         if (folder / MARKER).exists():
             raise ValueError('A success marker already exists. Do not clear it or repost.')
         record = json.loads((folder / PENDING).read_text(encoding='utf-8'))
@@ -127,7 +127,8 @@ class UI:
         elif choice == 'ABSENT':
             if self.ask('Allow a later retry?', 'Have you confirmed no post exists, and closed every old composer?\n'
                         'Only then clear this pending attempt. The next publication will be a new attempt.'):
-                (folder / PENDING).unlink()
+                allow_retry(folder)
+                self.info('Ready to retry', 'The reviewed post text is saved and will prefill the next publication dialog.')
 
     def choose_action(self, config, config_path):
         win = tk.Toplevel(self.root)
