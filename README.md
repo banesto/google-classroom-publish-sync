@@ -42,6 +42,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows.ps1
 
 The execution-policy option applies to that one installer process; it does not permanently change your system's policy. If Windows organization policy prevents script execution, it still takes precedence.
 
+Before updating, close all Classroom Publisher windows so an already-running process cannot keep using old code. From a Git clone, run `git pull`, then the installer above. The installer reinstalls directly from that checkout and compares the installed Python files and icons against it. Look for **Verified installed application:** before the completion message. Configuration and saved logins are preserved. If you still see the old error “Stream composer is unavailable; check student posting permissions”, an old application process or installation is running; the updated error begins “Cannot locate the Stream post box”.
+
 The installer:
 
 - Copies the application to `%LOCALAPPDATA%\ClassroomPublisher\app`.
